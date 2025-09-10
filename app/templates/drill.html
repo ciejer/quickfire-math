@@ -9,19 +9,41 @@
       <div class="timer" id="timer">0:00</div>
     </div>
 
-    <div class="prompt" id="prompt">{{ first_prompt }}</div>
-
-    <form id="answer-form" class="answer">
-      <input id="answer" inputmode="numeric" autocomplete="off" placeholder="Answer" required>
-      <button class="primary" type="submit">Enter</button>
-    </form>
+    <!-- Vertical equation -->
+    <div class="equation" id="equation">
+      <div class="eq-row"><span class="num" id="num-a"></span></div>
+      <div class="eq-row"><span class="op" id="op"></span><span class="num" id="num-b"></span></div>
+      <div class="rule"></div>
+      <form id="answer-form" class="answer">
+        <input id="answer" inputmode="numeric" autocomplete="off" placeholder="Answer" required class="answer-input">
+        <button class="primary" type="submit">Enter</button>
+      </form>
+    </div>
 
     <div class="helper" id="helper"></div>
+
+    <!-- Finish actions -->
+    <div id="finish-actions" class="finish-actions hidden">
+      <form id="again-form" method="post" action="/start">
+        <input type="hidden" name="drill_type" value="{{ drill_type }}">
+        <input type="hidden" name="count" value="{{ target_count }}">
+        <button class="primary" type="submit">Play again</button>
+      </form>
+      <a class="secondary" href="/home">Home</a>
+    </div>
   </section>
 
   <aside class="news-col">
+    <div class="stats-head">Drills finished today</div>
+    <ul id="stats-list" class="stats-list">
+      <li>Total: <strong>0</strong></li>
+      <li>Addition: <strong>0</strong></li>
+      <li>Subtraction: <strong>0</strong></li>
+      <li>Multiplication: <strong>0</strong></li>
+      <li>Division: <strong>0</strong></li>
+    </ul>
     <div class="news-head">Feed</div>
-    <div class="news-info">We’ll add your result here when you finish.</div>
+    <div id="feed-list"><div class="news-info">We’ll add your result here when you finish.</div></div>
   </aside>
 </div>
 
@@ -32,4 +54,7 @@ window.DRILL = {
   first: { prompt: "{{ first_prompt }}", answer: {{ first_answer }}, tts: "{{ first_tts }}" }
 };
 </script>
+
+<!-- Visual overlay for wrong answer -->
+<div id="overlay" class="overlay hidden"><div class="overlay-content" id="overlay-content"></div></div>
 {% endblock %}

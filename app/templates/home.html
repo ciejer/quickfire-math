@@ -2,33 +2,50 @@
 {% block content %}
 <div class="layout">
   <section class="main-col">
-    <h1 class="title">Kia ora, {{ user.display_name }}</h1>
-    <form method="post" action="/start" class="chooser">
+    <div class="row space-between">
+      <h1 class="title">Kia ora, {{ user.display_name }}</h1>
+      <a class="muted-link" href="/">← Back</a>
+    </div>
+
+    <form method="post" action="/start" class="chooser" id="choose-form">
       <label>Choose a drill</label>
-      <div class="ops">
-        {% if st.add_enabled %}<label><input type="radio" name="drill_type" value="addition" required> Addition</label>{% endif %}
-        {% if st.sub_enabled %}<label><input type="radio" name="drill_type" value="subtraction" required> Subtraction</label>{% endif %}
-        {% if st.mul_enabled %}<label><input type="radio" name="drill_type" value="multiplication" required> Multiplication</label>{% endif %}
-        {% if st.div_enabled %}<label><input type="radio" name="drill_type" value="division" required> Division</label>{% endif %}
+      <div class="op-cards">
+        {% if st.add_enabled %}<label class="op-card"><input type="radio" name="drill_type" value="addition" required><span>Addition</span></label>{% endif %}
+        {% if st.sub_enabled %}<label class="op-card"><input type="radio" name="drill_type" value="subtraction" required><span>Subtraction</span></label>{% endif %}
+        {% if st.mul_enabled %}<label class="op-card"><input type="radio" name="drill_type" value="multiplication" required><span>Multiplication</span></label>{% endif %}
+        {% if st.div_enabled %}<label class="op-card"><input type="radio" name="drill_type" value="division" required><span>Division</span></label>{% endif %}
       </div>
+
       <label>Questions (fixed):</label>
       <input type="number" name="count" value="20" min="10" max="50">
       <button class="primary">Start</button>
     </form>
   </section>
+
   <aside class="news-col">
+    <div class="stats-head">Drills finished today</div>
+    <ul id="stats-list" class="stats-list">
+      <li>Total: <strong>0</strong></li>
+      <li>Addition: <strong>0</strong></li>
+      <li>Subtraction: <strong>0</strong></li>
+      <li>Multiplication: <strong>0</strong></li>
+      <li>Division: <strong>0</strong></li>
+    </ul>
+
     <div class="news-head">Your newsfeed</div>
-    {% if drills %}
-      {% for d in drills %}
-      <div class="news-item">
-        <div class="news-time">{{ d.created_at.strftime("%A %I:%M %p") }}</div>
-        <div class="news-settings">{{ d.settings_snapshot }}</div>
-        <div class="news-result">{{ (d.elapsed_ms//60000) }} min {{ ((d.elapsed_ms//1000)%60) }} secs ({{ d.drill_type.value if d.drill_type else d.drill_type }})</div>
-      </div>
-      {% endfor %}
-    {% else %}
-      <div class="news-empty">No drills yet — hit Start and set your first time.</div>
-    {% endif %}
+    <div id="feed-list">
+      {% if drills %}
+        {% for d in drills %}
+        <div class="news-item">
+          <div class="news-time">{{ d.created_at.strftime("%A %I:%M %p") }}</div>
+          <div class="news-settings">{{ d.settings_snapshot }}</div>
+          <div class="news-result">{{ (d.elapsed_ms//60000) }} min {{ ((d.elapsed_ms//1000)%60) }} secs</div>
+        </div>
+        {% endfor %}
+      {% else %}
+        <div class="news-empty">No drills yet — hit Start and set your first time.</div>
+      {% endif %}
+    </div>
   </aside>
 </div>
 {% endblock %}

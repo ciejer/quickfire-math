@@ -17,7 +17,7 @@ class User(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     display_name: str
     created_at: datetime = Field(default_factory=datetime.utcnow)
-    # (No relationship fields needed for our usage)
+    # No ORM relationships needed for our usage (avoids SQLA typing issues)
 
 
 class UserSettings(SQLModel, table=True):
@@ -41,6 +41,7 @@ class UserSettings(SQLModel, table=True):
     mul_b_max: int = 12
 
     # Division (clean division): dividend_max, divisor_min/max
+    # Keeping this schema (no migration). Defaults chosen to yield quotient ≈ 1–12.
     div_enabled: bool = True
     div_dividend_max: int = 144
     div_divisor_min: int = 1
@@ -51,8 +52,8 @@ class DrillResult(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="user.id")
     drill_type: DrillTypeEnum
-    settings_snapshot: str  # human-friendly summary
+    # Store settings snapshot + (now) appended score text
+    settings_snapshot: str
     question_count: int = 20
     elapsed_ms: int
     created_at: datetime = Field(default_factory=datetime.utcnow)
-    # (No relationship field)

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from datetime import datetime, timedelta
 from fastapi import FastAPI, Request, Form, HTTPException
 from fastapi.responses import RedirectResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -11,7 +12,7 @@ from .storage import init_db, get_session
 from .models import User, UserSettings, DrillResult, DrillTypeEnum
 from .logic import generate_problem, human_settings
 
-APP_NAME = "Quickfire Math"
+APP_NAME = "Koiahi Maths"
 app = FastAPI(title=APP_NAME)
 BASE_DIR = os.path.dirname(__file__)
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
@@ -26,6 +27,11 @@ def startup():
 def get_user_id(request: Request) -> int | None:
     v = request.cookies.get("uid")
     return int(v) if v and v.isdigit() else None
+
+
+def _iso_z(dt: datetime) -> str:
+    # created_at stored as UTC-naive; treat as UTC and add Z
+    return dt.isoformat() + "Z"
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -68,7 +74,6 @@ def home(request: Request):
 
 @app.get("/settings", response_class=HTMLResponse)
 def settings(request: Request):
-    # Preload users and their settings up-front (avoid lazy-load after session close)
     with get_session() as s:
         users = list(s.exec(select(User)).all())
         settings_list = list(s.exec(select(UserSettings)).all())
@@ -193,18 +198,75 @@ def finish_drill(
     elapsed_ms: int = Form(...),
     settings_human: str = Form(...),
     question_count: int = Form(20),
+    score: int = Form(0),
 ):
     uid = get_user_id(request)
     if not uid:
         raise HTTPException(403)
+    snapshot = settings_human
+    if score and question_count:
+        snapshot = f"{settings_human} • Score {score}/{question_count}"
     with get_session() as s:
         rec = DrillResult(
             user_id=uid,
             drill_type=drill_type,
-            settings_snapshot=settings_human,
+            settings_snapshot=snapshot,
             question_count=question_count,
             elapsed_ms=elapsed_ms,
         )
         s.add(rec)
         s.commit()
     return JSONResponse({"ok": True})
+
+
+@app.get("/feed")
+def feed(request: Request, limit: int = 20):
+    uid = get_user_id(request)
+    if not uid:
+        raise HTTPException(403)
+    with get_session() as s:
+        drills = s.exec(
+            select(DrillResult)
+            .where(DrillResult.user_id == uid)
+            .order_by(DrillResult.created_at.desc())
+            .limit(limit)
+        ).all()
+    items = [
+        {
+            "ts": _iso_z(d.created_at),
+            "settings": d.settings_snapshot,
+            "elapsed_ms": d.elapsed_ms,
+            "type": d.drill_type.value if d.drill_type else str(d.drill_type),
+        }
+        for d in drills
+    ]
+    return JSONResponse({"items": items})
+
+
+@app.get("/stats")
+def stats(request: Request, tz_offset: int = 0):
+    """Counts for 'today' in the client's local timezone (offset minutes)."""
+    uid = get_user_id(request)
+    if not uid:
+        raise HTTPException(403)
+    offset = timedelta(minutes=tz_offset)
+    now_utc = datetime.utcnow()
+    local_now = now_utc - offset
+    start_local = datetime(local_now.year, local_now.month, local_now.day)
+    start_utc = start_local + offset
+    end_utc = start_utc + timedelta(days=1)
+    with get_session() as s:
+        drills = s.exec(
+            select(DrillResult)
+            .where(
+                DrillResult.user_id == uid,
+                DrillResult.created_at >= start_utc,
+                DrillResult.created_at < end_utc,
+            )
+        ).all()
+    counts = {"total": len(drills), "addition": 0, "subtraction": 0, "multiplication": 0, "division": 0}
+    for d in drills:
+        t = d.drill_type.value if hasattr(d.drill_type, "value") else str(d.drill_type)
+        if t in counts:
+            counts[t] += 1
+    return JSONResponse(counts)

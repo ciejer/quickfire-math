@@ -1,9 +1,8 @@
 """Core question generation and formatting logic."""
-
 from __future__ import annotations
+
 import random
 from typing import Tuple
-
 from .models import UserSettings
 
 # Problem is (prompt_str, correct_answer, tts_text)
@@ -51,10 +50,9 @@ def generate_problem(op: str, s: UserSettings) -> Problem:
         return (f"{a} × {b}", ans, _tts_for(op, a, b, ans))
 
     if op == "division":
-        divisor = _rand(s.div_divisor_min, s.div_divisor_max)
-        if divisor == 0:
-            divisor = 1
-        max_q = max(1, s.div_dividend_max // divisor)
+        divisor = _rand(s.div_divisor_min, s.div_divisor_max) or 1
+        # Friendly quotient range ≈ 1–12 by default; clamp to dividend_max.
+        max_q = max(1, min(12, s.div_dividend_max // divisor))
         quotient = _rand(1, max_q)
         dividend = divisor * quotient
         ans = quotient
@@ -71,5 +69,7 @@ def human_settings(op: str, s: UserSettings) -> str:
     if op == "multiplication":
         return f"Multiply: A {s.mul_a_min}–{s.mul_a_max}, B {s.mul_b_min}–{s.mul_b_max}"
     if op == "division":
-        return f"Divide: dividend ≤ {s.div_dividend_max}, divisor {s.div_divisor_min}–{s.div_divisor_max}"
+        # Describe in quotient-friendly terms for humans
+        q_hi = min(12, s.div_dividend_max // max(1, s.div_divisor_min))
+        return f"Divide: divisor {s.div_divisor_min}–{s.div_divisor_max}, quotient ≤ {q_hi}"
     return ""
