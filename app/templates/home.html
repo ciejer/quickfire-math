@@ -21,9 +21,9 @@
     {% if drills %}
       {% for d in drills %}
       <div class="news-item">
-        <div class="news-time">{{ d.created_at.astimezone().strftime("%A %I:%M %p") }}</div>
+        <div class="news-time">{{ d.created_at.strftime("%A %I:%M %p") }}</div>
         <div class="news-settings">{{ d.settings_snapshot }}</div>
-        <div class="news-result">{{ (d.elapsed_ms//60000) }} min {{ ((d.elapsed_ms//1000)%60) }} secs ({{ d.drill_type }})</div>
+        <div class="news-result">{{ (d.elapsed_ms//60000) }} min {{ ((d.elapsed_ms//1000)%60) }} secs ({{ d.drill_type.value if d.drill_type else d.drill_type }})</div>
       </div>
       {% endfor %}
     {% else %}

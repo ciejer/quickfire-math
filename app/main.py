@@ -1,39 +1,29 @@
-"""FastAPI entrypoint implementing the math drills web UI and API."""
-
 from __future__ import annotations
 
 import os
-from datetime import datetime
-
-from fastapi import FastAPI, Request, Form, Depends, HTTPException
+from fastapi import FastAPI, Request, Form, HTTPException
 from fastapi.responses import RedirectResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from pydantic import BaseModel
 from sqlmodel import select
 
 from .storage import init_db, get_session
-from .models import User, UserSettings, DrillResult, DrillType
+from .models import User, UserSettings, DrillResult, DrillTypeEnum
 from .logic import generate_problem, human_settings
 
-
-APP_NAME = "Koiahi Maths"
+APP_NAME = "Quickfire Math"
 app = FastAPI(title=APP_NAME)
 BASE_DIR = os.path.dirname(__file__)
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
-app.mount(
-    "/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static"
-)
+app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")
 
 
 @app.on_event("startup")
-def startup() -> None:
-    """Initialise the database once the app starts."""
+def startup():
     init_db()
 
 
 def get_user_id(request: Request) -> int | None:
-    """Retrieve the currently logged in user id from cookies."""
     v = request.cookies.get("uid")
     return int(v) if v and v.isdigit() else None
 
@@ -42,9 +32,7 @@ def get_user_id(request: Request) -> int | None:
 def login(request: Request):
     with get_session() as s:
         users = list(s.exec(select(User)).all())
-    return templates.TemplateResponse(
-        "login.html", {"request": request, "users": users, "app_name": APP_NAME}
-    )
+    return templates.TemplateResponse("login.html", {"request": request, "users": users, "app_name": APP_NAME})
 
 
 @app.post("/login")
@@ -69,25 +57,24 @@ def home(request: Request):
             s.add(st)
             s.commit()
             s.refresh(st)
-        drills = (
-            s.exec(
-                select(DrillResult)
-                .where(DrillResult.user_id == uid)
-                .order_by(DrillResult.created_at.desc())
-                .limit(20)
-            )
-            .all()
-        )
-    return templates.TemplateResponse(
-        "home.html", {"request": request, "user": user, "st": st, "drills": drills}
-    )
+        drills = s.exec(
+            select(DrillResult)
+            .where(DrillResult.user_id == uid)
+            .order_by(DrillResult.created_at.desc())
+            .limit(20)
+        ).all()
+    return templates.TemplateResponse("home.html", {"request": request, "user": user, "st": st, "drills": drills})
 
 
 @app.get("/settings", response_class=HTMLResponse)
 def settings(request: Request):
+    # Preload users and their settings up-front (avoid lazy-load after session close)
     with get_session() as s:
         users = list(s.exec(select(User)).all())
-    return templates.TemplateResponse("settings.html", {"request": request, "users": users})
+        settings_list = list(s.exec(select(UserSettings)).all())
+    settings_map = {st.user_id: st for st in settings_list}
+    rows = [{"user": u, "settings": settings_map.get(u.id)} for u in users]
+    return templates.TemplateResponse("settings.html", {"request": request, "rows": rows})
 
 
 @app.post("/settings/add_user")
@@ -132,9 +119,7 @@ def update_settings(
     div_divisor_max: int = Form(...),
 ):
     with get_session() as s:
-        st = (
-            s.exec(select(UserSettings).where(UserSettings.user_id == user_id)).first()
-        )
+        st = s.exec(select(UserSettings).where(UserSettings.user_id == user_id)).first()
         if not st:
             st = UserSettings(user_id=user_id)
             s.add(st)
@@ -153,20 +138,13 @@ def update_settings(
     return RedirectResponse(url="/settings", status_code=303)
 
 
-class StartPayload(BaseModel):
-    drill_type: DrillType
-    count: int = 20
-
-
 @app.post("/start")
-def start_drill(request: Request, drill_type: DrillType = Form(...), count: int = Form(20)):
+def start_drill(request: Request, drill_type: DrillTypeEnum = Form(...), count: int = Form(20)):
     uid = get_user_id(request)
     if not uid:
         raise HTTPException(403)
     with get_session() as s:
-        st = (
-            s.exec(select(UserSettings).where(UserSettings.user_id == uid)).first()
-        )
+        st = s.exec(select(UserSettings).where(UserSettings.user_id == uid)).first()
         user = s.get(User, uid)
     if not st or not user:
         raise HTTPException(404, "User not found")
@@ -176,15 +154,16 @@ def start_drill(request: Request, drill_type: DrillType = Form(...), count: int 
         "multiplication": st.mul_enabled,
         "division": st.div_enabled,
     }
-    if not enable_map[drill_type]:
+    if not enable_map[drill_type.value]:
         raise HTTPException(400, "Drill type disabled for this user")
-    prompt, ans, tts = generate_problem(drill_type, st)
-    settings_human = human_settings(drill_type, st)
+
+    prompt, ans, tts = generate_problem(drill_type.value, st)
+    settings_human = human_settings(drill_type.value, st)
     return templates.TemplateResponse(
         "drill.html",
         {
             "request": request,
-            "drill_type": drill_type,
+            "drill_type": drill_type.value,
             "target_count": count,
             "first_prompt": prompt,
             "first_answer": ans,
@@ -195,24 +174,22 @@ def start_drill(request: Request, drill_type: DrillType = Form(...), count: int 
 
 
 @app.post("/next")
-def next_problem(request: Request, drill_type: DrillType = Form(...)):
+def next_problem(request: Request, drill_type: DrillTypeEnum = Form(...)):
     uid = get_user_id(request)
     if not uid:
         raise HTTPException(403)
     with get_session() as s:
-        st = (
-            s.exec(select(UserSettings).where(UserSettings.user_id == uid)).first()
-        )
+        st = s.exec(select(UserSettings).where(UserSettings.user_id == uid)).first()
     if not st:
         raise HTTPException(404)
-    p, a, tts = generate_problem(drill_type, st)
+    p, a, tts = generate_problem(drill_type.value, st)
     return JSONResponse({"prompt": p, "answer": a, "tts": tts})
 
 
 @app.post("/finish")
 def finish_drill(
     request: Request,
-    drill_type: DrillType = Form(...),
+    drill_type: DrillTypeEnum = Form(...),
     elapsed_ms: int = Form(...),
     settings_human: str = Form(...),
     question_count: int = Form(20),

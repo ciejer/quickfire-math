@@ -1,1 +1,1 @@
-"""Package marker for koiahi maths app."""
+"""Package marker for Quickfire-math app."""

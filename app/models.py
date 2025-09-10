@@ -1,24 +1,32 @@
 from __future__ import annotations
-from typing import Optional, Literal
+from typing import Optional
 from datetime import datetime
+from enum import Enum
+
 from sqlmodel import SQLModel, Field, Relationship
 
 
-class User(SQLModel, table=True):
-    """Represents a player of the math drills."""
+class DrillTypeEnum(str, Enum):
+    addition = "addition"
+    subtraction = "subtraction"
+    multiplication = "multiplication"
+    division = "division"
 
+
+class User(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     display_name: str
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
-    # relationships
-    settings: "UserSettings" = Relationship(back_populates="user")
+    # If you do ever use this relationship in Python, make it one-to-one
+    # Note: we avoid using it in templates to prevent lazy-load issues.
+    settings: Optional["UserSettings"] = Relationship(
+        back_populates="user", sa_relationship_kwargs={"uselist": False}
+    )
     drills: list["DrillResult"] = Relationship(back_populates="user")
 
 
 class UserSettings(SQLModel, table=True):
-    """Stores per‑user preferences for each drill type."""
-
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="user.id")
 
@@ -44,18 +52,13 @@ class UserSettings(SQLModel, table=True):
     div_divisor_min: int = 1
     div_divisor_max: int = 12
 
-    user: User = Relationship(back_populates="settings")
-
-
-DrillType = Literal["addition", "subtraction", "multiplication", "division"]
+    user: Optional[User] = Relationship(back_populates="settings")
 
 
 class DrillResult(SQLModel, table=True):
-    """Persisted history for completed drills."""
-
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="user.id")
-    drill_type: DrillType
+    drill_type: DrillTypeEnum
     # store settings snapshot for the newsfeed
     settings_snapshot: str  # human-friendly summary
     question_count: int = 20
