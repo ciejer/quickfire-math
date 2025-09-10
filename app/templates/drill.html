@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="drill-layout">
+  <section class="main-col">
+    <div class="statusbar">
+      <div>Type: <strong>{{ drill_type }}</strong></div>
+      <div>Settings: <strong id="settings-human">{{ settings_human }}</strong></div>
+      <div>Q:<strong><span id="q-done">0</span>/<span id="q-total">{{ target_count }}</span></strong></div>
+      <div class="timer" id="timer">0:00</div>
+    </div>
+
+    <div class="prompt" id="prompt">{{ first_prompt }}</div>
+
+    <form id="answer-form" class="answer">
+      <input id="answer" inputmode="numeric" autocomplete="off" placeholder="Answer" required>
+      <button class="primary" type="submit">Enter</button>
+    </form>
+
+    <div class="helper" id="helper"></div>
+  </section>
+
+  <aside class="news-col">
+    <div class="news-head">Feed</div>
+    <div class="news-info">We’ll add your result here when you finish.</div>
+  </aside>
+</div>
+
+<script>
+window.DRILL = {
+  type: "{{ drill_type }}",
+  target: {{ target_count }},
+  first: { prompt: "{{ first_prompt }}", answer: {{ first_answer }}, tts: "{{ first_tts }}" }
+};
+</script>
+{% endblock %}

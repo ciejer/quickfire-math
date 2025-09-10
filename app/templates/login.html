@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="layout">
+  <section class="main-col">
+    <h1 class="title">Who’s playing?</h1>
+    <form method="post" action="/login" class="user-grid">
+      {% for u in users %}
+        <button name="user_id" value="{{u.id}}" class="user-card" type="submit">{{u.display_name}}</button>
+      {% endfor %}
+    </form>
+    <p class="note"><a href="/settings">Add or edit users</a></p>
+  </section>
+  <aside class="news-col">
+    <div class="news-head">Recent drills</div>
+    <div class="news-empty">Log in to see your feed.</div>
+  </aside>
+</div>
+{% endblock %}
