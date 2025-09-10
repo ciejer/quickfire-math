@@ -5,19 +5,19 @@ from __future__ import annotations
 import random
 from typing import Literal, Tuple
 
-from .models import UserSettings, DrillType
+from .models import UserSettings, DrillTypeEnum
 
 # Problem is (prompt_str, correct_answer, tts_text)
 Problem = Tuple[str, int, str]
 
 
-def _tts_for(op: DrillType, a: int, b: int, ans: int) -> str:
+def _tts_for(op: DrillTypeEnum, a: int, b: int, ans: int) -> str:
     """Return a human‑readable spoken phrase for the operation."""
     words = {
-        "addition": f"{a} plus {b} equals {ans}",
-        "subtraction": f"{a} minus {b} equals {ans}",
-        "multiplication": f"{a} times {b} equals {ans}",
-        "division": f"{a} divided by {b} equals {ans}",
+        DrillTypeEnum.ADDITION: f"{a} plus {b} equals {ans}",
+        DrillTypeEnum.SUBTRACTION: f"{a} minus {b} equals {ans}",
+        DrillTypeEnum.MULTIPLICATION: f"{a} times {b} equals {ans}",
+        DrillTypeEnum.DIVISION: f"{a} divided by {b} equals {ans}",
     }
     return words[op]
 
@@ -35,24 +35,24 @@ def _rand(a: int, b: int) -> int:
     return random.randint(a, b)
 
 
-def generate_problem(op: DrillType, s: UserSettings) -> Problem:
+def generate_problem(op: DrillTypeEnum, s: UserSettings) -> Problem:
     """Generate a new problem for the given operation and user settings."""
-    if op == "addition":
+    if op == DrillTypeEnum.ADDITION:
         a, b = _rand(s.add_min, s.add_max), _rand(s.add_min, s.add_max)
         ans = a + b
         return (f"{a} + {b}", ans, _tts_for(op, a, b, ans))
-    if op == "subtraction":
+    if op == DrillTypeEnum.SUBTRACTION:
         a, b = _rand(s.sub_min, s.sub_max), _rand(s.sub_min, s.sub_max)
         if a < b:
             a, b = b, a
         ans = a - b
         return (f"{a} − {b}", ans, _tts_for(op, a, b, ans))
-    if op == "multiplication":
+    if op == DrillTypeEnum.MULTIPLICATION:
         a = _rand(s.mul_a_min, s.mul_a_max)
         b = _rand(s.mul_b_min, s.mul_b_max)
         ans = a * b
         return (f"{a} × {b}", ans, _tts_for(op, a, b, ans))
-    if op == "division":
+    if op == DrillTypeEnum.DIVISION:
         divisor = _rand(s.div_divisor_min, s.div_divisor_max) or 1
         max_q = max(1, s.div_dividend_max // divisor)
         quotient = _rand(1, max_q)
@@ -62,14 +62,14 @@ def generate_problem(op: DrillType, s: UserSettings) -> Problem:
     raise ValueError("Unsupported op")
 
 
-def human_settings(op: DrillType, s: UserSettings) -> str:
+def human_settings(op: DrillTypeEnum, s: UserSettings) -> str:
     """Produce a brief summary of the settings for display."""
-    if op == "addition":
+    if op == DrillTypeEnum.ADDITION:
         return f"Add: {s.add_min}–{s.add_max}"
-    if op == "subtraction":
+    if op == DrillTypeEnum.SUBTRACTION:
         return f"Subtract: {s.sub_min}–{s.sub_max}"
-    if op == "multiplication":
+    if op == DrillTypeEnum.MULTIPLICATION:
         return f"Multiply: A {s.mul_a_min}–{s.mul_a_max}, B {s.mul_b_min}–{s.mul_b_max}"
-    if op == "division":
+    if op == DrillTypeEnum.DIVISION:
         return f"Divide: dividend ≤ {s.div_dividend_max}, divisor {s.div_divisor_min}–{s.div_divisor_max}"
     return ""
