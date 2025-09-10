@@ -18,7 +18,6 @@
       <!-- Answer aligned right, button out to the far right -->
       <form id="answer-form" class="answer">
         <input id="answer" inputmode="numeric" autocomplete="off" placeholder="Answer" required class="answer-input">
-        <button class="btn btn-primary" type="submit">Enter</button>
       </form>
     </div>
 
@@ -29,8 +28,8 @@
       <form id="again-form" method="post" action="/start" class="finish-form">
         <input type="hidden" name="drill_type" value="{{ drill_type }}">
         <button class="btn btn-primary btn-wide" type="submit">Play again</button>
+        <button class="btn btn-secondary btn-wide" type="button" onclick="location.href='/home'">Home</button>
       </form>
-      <a class="btn btn-secondary btn-wide" href="/home">Home</a>
     </div>
   </section>
 
