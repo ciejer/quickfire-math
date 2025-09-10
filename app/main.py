@@ -15,7 +15,7 @@ from .models import (
 )
 from .logic import generate_problem, human_settings
 
-APP_NAME = "Koiahi Maths"
+APP_NAME = "Quickfire Math"
 app = FastAPI(title=APP_NAME)
 BASE_DIR = os.path.dirname(__file__)
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
@@ -46,9 +46,9 @@ def startup():
             else:
                 cfg.admin_password_plain = pwd
             s.commit()
-            print(f"[Koiahi] Admin password (generated): {pwd}")
+            print(f"[Quickfire Math] Admin password (generated): {pwd}")
         else:
-            print(f"[Koiahi] Admin password: {cfg.admin_password_plain}")
+            print(f"[Quickfire Math] Admin password: {cfg.admin_password_plain}")
 
 def get_user_id(request: Request) -> int | None:
     v = request.cookies.get("uid")
@@ -465,7 +465,7 @@ def admin_change_password(request: Request, new_password: str = Form(...)):
         else:
             cfg.admin_password_plain = new_password
         s.commit()
-    print(f"[Koiahi] Admin password (changed): {new_password}")
+    print(f"[Quickfire Math] Admin password (changed): {new_password}")
     return RedirectResponse("/admin", status_code=303)
 
 @app.post("/admin/delete_user")
