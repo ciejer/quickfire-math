@@ -7,7 +7,7 @@
     <form method="post" action="/login" class="op-cards" id="login-form">
       {% for u in users %}
         <label class="op-card">
-          <input type="radio" name="user_id" value="{{u.id}}" required>
+            <input type="radio" name="user_id" value="{{u.id}}" onchange="this.form.submit()" required>
           <span>{{u.display_name}}</span>
         </label>
       {% endfor %}
