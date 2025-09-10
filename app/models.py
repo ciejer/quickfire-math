@@ -17,14 +17,13 @@ class User(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     display_name: str
     created_at: datetime = Field(default_factory=datetime.utcnow)
-    # No ORM relationships needed for our usage (avoids SQLA typing issues)
 
 
 class UserSettings(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="user.id")
 
-    # Addition/Subtraction share symmetric bounds
+    # Addition/Subtraction symmetric bounds
     add_enabled: bool = True
     add_min: int = 0
     add_max: int = 12
@@ -40,8 +39,7 @@ class UserSettings(SQLModel, table=True):
     mul_b_min: int = 1
     mul_b_max: int = 12
 
-    # Division (clean division): dividend_max, divisor_min/max
-    # Keeping this schema (no migration). Defaults chosen to yield quotient ≈ 1–12.
+    # Division (kept schema, friendly defaults)
     div_enabled: bool = True
     div_dividend_max: int = 144
     div_divisor_min: int = 1
@@ -52,8 +50,46 @@ class DrillResult(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="user.id")
     drill_type: DrillTypeEnum
-    # Store settings snapshot + (now) appended score text
     settings_snapshot: str
     question_count: int = 20
     elapsed_ms: int
     created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class DrillQuestion(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    drill_result_id: int = Field(foreign_key="drillresult.id")
+    drill_type: DrillTypeEnum
+    a: int
+    b: int
+    prompt: str
+    correct_answer: int
+    given_answer: int
+    correct: bool
+    started_at: datetime
+    elapsed_ms: int
+
+
+class AdminConfig(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    # Stored in plaintext per your spec so it can be re-printed each boot
+    admin_password_plain: str
+
+
+class MinExpectations(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id")
+
+    # Addition/Subtraction: required inclusion range
+    add_req_min: int = 0
+    add_req_max: int = 10
+    sub_req_min: int = 0
+    sub_req_max: int = 10
+
+    # Multiplication: both factor ranges must include these
+    mul_a_req_min: int = 1
+    mul_a_req_max: int = 7
+    mul_b_req_min: int = 1
+    mul_b_req_max: int = 7
+
+    # (Division left for later once quotient limits are added)

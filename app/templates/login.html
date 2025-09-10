@@ -1,18 +1,20 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="layout">
-  <section class="main-col">
+  <section class="main-col" style="grid-column: 1 / span 2;">
     <h1 class="title">Who’s playing?</h1>
-    <form method="post" action="/login" class="user-grid">
+    <form method="post" action="/login" class="op-cards">
       {% for u in users %}
-        <button name="user_id" value="{{u.id}}" class="user-card" type="submit">{{u.display_name}}</button>
+        <label class="op-card">
+          <input type="radio" name="user_id" value="{{u.id}}" required>
+          <span>{{u.display_name}}</span>
+        </label>
       {% endfor %}
+      <div style="width:100%; margin-top:10px;">
+        <button class="primary" type="submit">Continue</button>
+      </div>
     </form>
-    <p class="note"><a href="/settings">Add or edit users</a></p>
+    <p class="note"><a href="/admin">Manager console</a></p>
   </section>
-  <aside class="news-col">
-    <div class="news-head">Recent drills</div>
-    <div class="news-empty">Log in to see your feed.</div>
-  </aside>
 </div>
 {% endblock %}

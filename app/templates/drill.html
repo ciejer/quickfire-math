@@ -14,6 +14,7 @@
       <div class="eq-row"><span class="num" id="num-a"></span></div>
       <div class="eq-row"><span class="op" id="op"></span><span class="num" id="num-b"></span></div>
       <div class="rule"></div>
+
       <form id="answer-form" class="answer">
         <input id="answer" inputmode="numeric" autocomplete="off" placeholder="Answer" required class="answer-input">
         <button class="primary" type="submit">Enter</button>
@@ -26,10 +27,9 @@
     <div id="finish-actions" class="finish-actions hidden">
       <form id="again-form" method="post" action="/start">
         <input type="hidden" name="drill_type" value="{{ drill_type }}">
-        <input type="hidden" name="count" value="{{ target_count }}">
         <button class="primary" type="submit">Play again</button>
       </form>
-      <a class="secondary" href="/home">Home</a>
+      <a class="secondary equal-btn" href="/home">Home</a>
     </div>
   </section>
 

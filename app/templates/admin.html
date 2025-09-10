@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="layout">
+  <section class="main-col" style="grid-column: 1 / span 2;">
+    <h1 class="title">Manager console</h1>
+
+    {% if not admin %}
+      <form method="post" action="/admin/login" class="row">
+        <input type="password" name="password" placeholder="Admin password" required>
+        <button class="primary">Sign in</button>
+      </form>
+      <p class="note">The admin password is printed to the container logs on boot.</p>
+    {% else %}
+
+      <h2>Admin password</h2>
+      <form method="post" action="/admin/password" class="row">
+        <input type="password" name="new_password" placeholder="New password" required>
+        <button class="primary">Change</button>
+      </form>
+
+      <h2>User management</h2>
+      <form method="post" action="/admin/delete_user" class="row" onsubmit="return confirm('Delete user? This removes their history.');">
+        <select name="user_id" required>
+          {% for u in users %}
+            <option value="{{u.id}}">{{u.display_name}}</option>
+          {% endfor %}
+        </select>
+        <button class="danger">Delete user</button>
+      </form>
+
+      <h2>Minimum expectations</h2>
+      <form method="post" action="/admin/expectations" class="grid">
+        <div class="row">
+          <label>User
+            <select name="user_id" required>
+              {% for u in users %}
+                <option value="{{u.id}}">{{u.display_name}}</option>
+              {% endfor %}
+            </select>
+          </label>
+        </div>
+
+        <fieldset>
+          <legend>Addition (required inclusion)</legend>
+          <div class="row">
+            <label>Min <input type="number" name="add_req_min" value="0"></label>
+            <label>Max <input type="number" name="add_req_max" value="10"></label>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Subtraction (required inclusion)</legend>
+          <div class="row">
+            <label>Min <input type="number" name="sub_req_min" value="0"></label>
+            <label>Max <input type="number" name="sub_req_max" value="10"></label>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Multiplication (both factors must include)</legend>
+          <div class="row">
+            <label>First factor min <input type="number" name="mul_a_req_min" value="1"></label>
+            <label>First factor max <input type="number" name="mul_a_req_max" value="7"></label>
+          </div>
+          <div class="row">
+            <label>Second factor min <input type="number" name="mul_b_req_min" value="1"></label>
+            <label>Second factor max <input type="number" name="mul_b_req_max" value="7"></label>
+          </div>
+        </fieldset>
+
+        <div class="row right">
+          <button class="primary">Save expectations</button>
+        </div>
+      </form>
+
+      <p class="note"><a href="/admin/logout">Sign out</a></p>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

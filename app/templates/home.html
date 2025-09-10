@@ -7,6 +7,7 @@
       <a class="muted-link" href="/">← Back</a>
     </div>
 
+    <!-- Choose a drill -->
     <form method="post" action="/start" class="chooser" id="choose-form">
       <label>Choose a drill</label>
       <div class="op-cards">
@@ -15,11 +16,66 @@
         {% if st.mul_enabled %}<label class="op-card"><input type="radio" name="drill_type" value="multiplication" required><span>Multiplication</span></label>{% endif %}
         {% if st.div_enabled %}<label class="op-card"><input type="radio" name="drill_type" value="division" required><span>Division</span></label>{% endif %}
       </div>
-
-      <label>Questions (fixed):</label>
-      <input type="number" name="count" value="20" min="10" max="50">
       <button class="primary">Start</button>
     </form>
+
+    <!-- Your settings (inline) -->
+    <h2>Your settings</h2>
+    <form id="settings-form" class="grid">
+      <input type="hidden" name="user_id" value="{{ user.id }}">
+
+      <fieldset>
+        <legend>Addition</legend>
+        <label><input type="checkbox" name="add_enabled" {% if st.add_enabled %}checked{% endif %}> Enabled</label>
+        <div class="row">
+          <label>Smallest number <input type="number" name="add_min" value="{{ st.add_min }}"></label>
+          <label>Largest number <input type="number" name="add_max" value="{{ st.add_max }}"></label>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Subtraction</legend>
+        <label><input type="checkbox" name="sub_enabled" {% if st.sub_enabled %}checked{% endif %}> Enabled</label>
+        <div class="row">
+          <label>Smallest number <input type="number" name="sub_min" value="{{ st.sub_min }}"></label>
+          <label>Largest number <input type="number" name="sub_max" value="{{ st.sub_max }}"></label>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Multiplication</legend>
+        <label><input type="checkbox" name="mul_enabled" {% if st.mul_enabled %}checked{% endif %}> Enabled</label>
+        <div class="row">
+          <label>First factor min <input type="number" name="mul_a_min" value="{{ st.mul_a_min }}"></label>
+          <label>First factor max <input type="number" name="mul_a_max" value="{{ st.mul_a_max }}"></label>
+        </div>
+        <div class="row">
+          <label>Second factor min <input type="number" name="mul_b_min" value="{{ st.mul_b_min }}"></label>
+          <label>Second factor max <input type="number" name="mul_b_max" value="{{ st.mul_b_max }}"></label>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Division</legend>
+        <label><input type="checkbox" name="div_enabled" {% if st.div_enabled %}checked{% endif %}> Enabled</label>
+        <div class="row">
+          <label>Largest dividend <input type="number" name="div_dividend_max" value="{{ st.div_dividend_max }}"></label>
+        </div>
+        <div class="row">
+          <label>Divisor min <input type="number" name="div_divisor_min" value="{{ st.div_divisor_min }}"></label>
+          <label>Divisor max <input type="number" name="div_divisor_max" value="{{ st.div_divisor_max }}"></label>
+        </div>
+      </fieldset>
+
+      <div class="row right">
+        <button class="primary" type="button" id="save-settings">Save</button>
+        <span id="save-msg" class="note"></span>
+      </div>
+    </form>
+
+    <!-- Performance -->
+    <h2>Recent performance</h2>
+    <div id="report-mul" class="heatmap"></div>
   </section>
 
   <aside class="news-col">
@@ -43,9 +99,21 @@
         </div>
         {% endfor %}
       {% else %}
-        <div class="news-empty">No drills yet — hit Start and set your first time.</div>
+        <div class="news-empty">No drills yet — hit Start.</div>
       {% endif %}
     </div>
   </aside>
+
+  <script>
+    // Save settings via fetch (so we can show friendly validation errors)
+    document.getElementById('save-settings').addEventListener('click', async () => {
+      const form = document.getElementById('settings-form');
+      const msg = document.getElementById('save-msg');
+      const fd = new FormData(form);
+      const res = await fetch('/settings/update', { method: 'POST', body: fd });
+      if (res.ok) { msg.textContent = 'Saved!'; setTimeout(()=>msg.textContent='', 2000); }
+      else { msg.textContent = await res.text(); }
+    });
+  </script>
 </div>
 {% endblock %}
