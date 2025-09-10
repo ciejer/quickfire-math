@@ -496,3 +496,22 @@ def admin_expectations(request: Request,
         mins.mul_b_req_min = mul_b_req_min; mins.mul_b_req_max = mul_b_req_max
         s.add(mins); s.commit()
     return RedirectResponse("/admin", status_code=303)
+@app.get("/admin/expectations/get")
+def admin_expectations_get(user_id: int):
+    """Return current MinExpectations for a user (or sensible defaults) for admin form prefill."""
+    with get_session() as s:
+        mins = s.exec(select(MinExpectations).where(MinExpectations.user_id == user_id)).first()
+    if not mins:
+        # defaults aligned with model defaults
+        return JSONResponse({
+            "add_req_min": 0, "add_req_max": 10,
+            "sub_req_min": 0, "sub_req_max": 10,
+            "mul_a_req_min": 1, "mul_a_req_max": 7,
+            "mul_b_req_min": 1, "mul_b_req_max": 7,
+        })
+    return JSONResponse({
+        "add_req_min": mins.add_req_min, "add_req_max": mins.add_req_max,
+        "sub_req_min": mins.sub_req_min, "sub_req_max": mins.sub_req_max,
+        "mul_a_req_min": mins.mul_a_req_min, "mul_a_req_max": mins.mul_a_req_max,
+        "mul_b_req_min": mins.mul_b_req_min, "mul_b_req_max": mins.mul_b_req_max,
+    })

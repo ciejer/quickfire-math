@@ -16,72 +16,78 @@
         {% if st.mul_enabled %}<label class="op-card"><input type="radio" name="drill_type" value="multiplication" required><span>Multiplication</span></label>{% endif %}
         {% if st.div_enabled %}<label class="op-card"><input type="radio" name="drill_type" value="division" required><span>Division</span></label>{% endif %}
       </div>
-      <button class="primary">Start</button>
+      <button class="btn btn-primary">Start</button>
     </form>
 
-    <!-- Your settings (inline) -->
-    <h2>Your settings</h2>
-    <form id="settings-form" class="grid">
-      <input type="hidden" name="user_id" value="{{ user.id }}">
+    <!-- Your settings (collapsible) -->
+    <details class="expander">
+      <summary>Settings</summary>
+      <form id="settings-form" class="grid">
+        <input type="hidden" name="user_id" value="{{ user.id }}">
 
-      <fieldset>
-        <legend>Addition</legend>
-        <label><input type="checkbox" name="add_enabled" {% if st.add_enabled %}checked{% endif %}> Enabled</label>
-        <div class="row">
-          <label>Smallest number <input type="number" name="add_min" value="{{ st.add_min }}"></label>
-          <label>Largest number <input type="number" name="add_max" value="{{ st.add_max }}"></label>
-        </div>
-      </fieldset>
+        <fieldset>
+          <legend>Addition</legend>
+          <label><input type="checkbox" name="add_enabled" {% if st.add_enabled %}checked{% endif %}> Enabled</label>
+          <div class="row">
+            <label>Smallest number <input type="number" name="add_min" value="{{ st.add_min }}"></label>
+            <label>Largest number <input type="number" name="add_max" value="{{ st.add_max }}"></label>
+          </div>
+        </fieldset>
 
-      <fieldset>
-        <legend>Subtraction</legend>
-        <label><input type="checkbox" name="sub_enabled" {% if st.sub_enabled %}checked{% endif %}> Enabled</label>
-        <div class="row">
-          <label>Smallest number <input type="number" name="sub_min" value="{{ st.sub_min }}"></label>
-          <label>Largest number <input type="number" name="sub_max" value="{{ st.sub_max }}"></label>
-        </div>
-      </fieldset>
+        <fieldset>
+          <legend>Subtraction</legend>
+          <label><input type="checkbox" name="sub_enabled" {% if st.sub_enabled %}checked{% endif %}> Enabled</label>
+          <div class="row">
+            <label>Smallest number <input type="number" name="sub_min" value="{{ st.sub_min }}"></label>
+            <label>Largest number <input type="number" name="sub_max" value="{{ st.sub_max }}"></label>
+          </div>
+        </fieldset>
 
-      <fieldset>
-        <legend>Multiplication</legend>
-        <label><input type="checkbox" name="mul_enabled" {% if st.mul_enabled %}checked{% endif %}> Enabled</label>
-        <div class="row">
-          <label>First factor min <input type="number" name="mul_a_min" value="{{ st.mul_a_min }}"></label>
-          <label>First factor max <input type="number" name="mul_a_max" value="{{ st.mul_a_max }}"></label>
-        </div>
-        <div class="row">
-          <label>Second factor min <input type="number" name="mul_b_min" value="{{ st.mul_b_min }}"></label>
-          <label>Second factor max <input type="number" name="mul_b_max" value="{{ st.mul_b_max }}"></label>
-        </div>
-      </fieldset>
+        <fieldset>
+          <legend>Multiplication</legend>
+          <label><input type="checkbox" name="mul_enabled" {% if st.mul_enabled %}checked{% endif %}> Enabled</label>
+          <div class="row">
+            <label>First factor min <input type="number" name="mul_a_min" value="{{ st.mul_a_min }}"></label>
+            <label>First factor max <input type="number" name="mul_a_max" value="{{ st.mul_a_max }}"></label>
+          </div>
+          <div class="row">
+            <label>Second factor min <input type="number" name="mul_b_min" value="{{ st.mul_b_min }}"></label>
+            <label>Second factor max <input type="number" name="mul_b_max" value="{{ st.mul_b_max }}"></label>
+          </div>
+        </fieldset>
 
-      <fieldset>
-        <legend>Division</legend>
-        <label><input type="checkbox" name="div_enabled" {% if st.div_enabled %}checked{% endif %}> Enabled</label>
-        <div class="row">
-          <label>Quotient min <input type="number" name="div_q_min" value="{{ st.div_q_min }}"></label>
-          <label>Quotient max <input type="number" name="div_q_max" value="{{ st.div_q_max }}"></label>
-        </div>
-        <div class="row">
-          <label>Divisor min <input type="number" name="div_divisor_min" value="{{ st.div_divisor_min }}"></label>
-          <label>Divisor max <input type="number" name="div_divisor_max" value="{{ st.div_divisor_max }}"></label>
-        </div>
-      </fieldset>
+        <fieldset>
+          <legend>Division</legend>
+          <label><input type="checkbox" name="div_enabled" {% if st.div_enabled %}checked{% endif %}> Enabled</label>
+          <div class="row">
+            <label>Quotient min <input type="number" name="div_q_min" value="{{ st.div_q_min }}"></label>
+            <label>Quotient max <input type="number" name="div_q_max" value="{{ st.div_q_max }}"></label>
+          </div>
+          <div class="row">
+            <label>Divisor min <input type="number" name="div_divisor_min" value="{{ st.div_divisor_min }}"></label>
+            <label>Divisor max <input type="number" name="div_divisor_max" value="{{ st.div_divisor_max }}"></label>
+          </div>
+        </fieldset>
 
-      <div class="row right">
-        <button class="primary" type="button" id="save-settings">Save</button>
-        <span id="save-msg" class="note"></span>
+        <div class="row right">
+          <button class="btn btn-primary" type="button" id="save-settings">Save</button>
+          <span id="save-msg" class="note"></span>
+        </div>
+      </form>
+    </details>
+
+    <!-- Performance (collapsible) -->
+    <details class="expander">
+      <summary>Reports</summary>
+      <div class="reports">
+        <h3>Multiplication</h3>
+        <div id="report-mul" class="heatmap"></div>
+        <h3>Addition (0–20)</h3>
+        <div id="report-add" class="heatmap"></div>
+        <h3>Subtraction (0–20, larger − smaller)</h3>
+        <div id="report-sub" class="heatmap"></div>
       </div>
-    </form>
-
-    <!-- Performance -->
-    <h2>Recent performance</h2>
-    <h3>Multiplication</h3>
-    <div id="report-mul" class="heatmap"></div>
-    <h3>Addition (0–20)</h3>
-    <div id="report-add" class="heatmap"></div>
-    <h3>Subtraction (0–20, larger − smaller)</h3>
-    <div id="report-sub" class="heatmap"></div>
+    </details>
   </section>
 
   <aside class="news-col">

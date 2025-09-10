@@ -4,22 +4,19 @@
   <section class="main-col" style="grid-column: 1 / span 2;">
     <h1 class="title">Who’s playing?</h1>
 
-    <form method="post" action="/login" class="op-cards">
+    <form method="post" action="/login" class="op-cards" id="login-form">
       {% for u in users %}
         <label class="op-card">
           <input type="radio" name="user_id" value="{{u.id}}" required>
           <span>{{u.display_name}}</span>
         </label>
       {% endfor %}
-      <div style="width:100%; margin-top:10px;">
-        <button class="primary" type="submit">Continue</button>
-      </div>
     </form>
 
     <h2 style="margin-top:18px;">New here?</h2>
     <form method="post" action="/user/add" class="row">
       <input type="text" name="display_name" placeholder="Your name" required>
-      <button class="primary">Add and start</button>
+      <button class="btn btn-primary">Add and start</button>
     </form>
 
     <p class="note" style="margin-top:10px;"><a href="/admin">Manager console</a></p>

@@ -15,21 +15,22 @@
       <div class="eq-row"><span class="op" id="op"></span><span class="num" id="num-b"></span></div>
       <div class="rule"></div>
 
+      <!-- Answer aligned right, button out to the far right -->
       <form id="answer-form" class="answer">
         <input id="answer" inputmode="numeric" autocomplete="off" placeholder="Answer" required class="answer-input">
-        <button class="primary" type="submit">Enter</button>
+        <button class="btn btn-primary" type="submit">Enter</button>
       </form>
     </div>
 
     <div class="helper" id="helper"></div>
 
-    <!-- Finish actions -->
+    <!-- Finish actions: equal size buttons -->
     <div id="finish-actions" class="finish-actions hidden">
-      <form id="again-form" method="post" action="/start">
+      <form id="again-form" method="post" action="/start" class="finish-form">
         <input type="hidden" name="drill_type" value="{{ drill_type }}">
-        <button class="primary" type="submit">Play again</button>
+        <button class="btn btn-primary btn-wide" type="submit">Play again</button>
       </form>
-      <a class="secondary equal-btn" href="/home">Home</a>
+      <a class="btn btn-secondary btn-wide" href="/home">Home</a>
     </div>
   </section>
 

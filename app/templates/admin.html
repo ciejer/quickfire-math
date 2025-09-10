@@ -7,7 +7,7 @@
     {% if not admin %}
       <form method="post" action="/admin/login" class="row">
         <input type="password" name="password" placeholder="Admin password" required>
-        <button class="primary">Sign in</button>
+        <button class="btn btn-primary">Sign in</button>
       </form>
       <p class="note">The admin password is printed to the container logs on boot.</p>
     {% else %}
@@ -15,24 +15,24 @@
       <h2>Admin password</h2>
       <form method="post" action="/admin/password" class="row">
         <input type="password" name="new_password" placeholder="New password" required>
-        <button class="primary">Change</button>
+        <button class="btn btn-primary">Change</button>
       </form>
 
       <h2>User management</h2>
       <form method="post" action="/admin/delete_user" class="row" onsubmit="return confirm('Delete user? This removes their history.');">
-        <select name="user_id" required>
+        <select name="user_id" id="delete-user-id" required>
           {% for u in users %}
             <option value="{{u.id}}">{{u.display_name}}</option>
           {% endfor %}
         </select>
-        <button class="danger">Delete user</button>
+        <button class="btn btn-danger">Delete user</button>
       </form>
 
       <h2>Minimum expectations</h2>
-      <form method="post" action="/admin/expectations" class="grid">
+      <form method="post" action="/admin/expectations" class="grid" id="expectations-form">
         <div class="row">
           <label>User
-            <select name="user_id" required>
+            <select name="user_id" id="exp-user-id" required>
               {% for u in users %}
                 <option value="{{u.id}}">{{u.display_name}}</option>
               {% endfor %}
@@ -43,37 +43,53 @@
         <fieldset>
           <legend>Addition (required inclusion)</legend>
           <div class="row">
-            <label>Min <input type="number" name="add_req_min" value="0"></label>
-            <label>Max <input type="number" name="add_req_max" value="10"></label>
+            <label>Min <input type="number" name="add_req_min" id="add_req_min"></label>
+            <label>Max <input type="number" name="add_req_max" id="add_req_max"></label>
           </div>
         </fieldset>
 
         <fieldset>
           <legend>Subtraction (required inclusion)</legend>
           <div class="row">
-            <label>Min <input type="number" name="sub_req_min" value="0"></label>
-            <label>Max <input type="number" name="sub_req_max" value="10"></label>
+            <label>Min <input type="number" name="sub_req_min" id="sub_req_min"></label>
+            <label>Max <input type="number" name="sub_req_max" id="sub_req_max"></label>
           </div>
         </fieldset>
 
         <fieldset>
           <legend>Multiplication (both factors must include)</legend>
           <div class="row">
-            <label>First factor min <input type="number" name="mul_a_req_min" value="1"></label>
-            <label>First factor max <input type="number" name="mul_a_req_max" value="7"></label>
+            <label>First factor min <input type="number" name="mul_a_req_min" id="mul_a_req_min"></label>
+            <label>First factor max <input type="number" name="mul_a_req_max" id="mul_a_req_max"></label>
           </div>
           <div class="row">
-            <label>Second factor min <input type="number" name="mul_b_req_min" value="1"></label>
-            <label>Second factor max <input type="number" name="mul_b_req_max" value="7"></label>
+            <label>Second factor min <input type="number" name="mul_b_req_min" id="mul_b_req_min"></label>
+            <label>Second factor max <input type="number" name="mul_b_req_max" id="mul_b_req_max"></label>
           </div>
         </fieldset>
 
         <div class="row right">
-          <button class="primary">Save expectations</button>
+          <button class="btn btn-primary">Save expectations</button>
         </div>
       </form>
 
       <p class="note"><a href="/admin/logout">Sign out</a></p>
+
+      <script>
+        async function loadExpectations(uid) {
+          const res = await fetch(`/admin/expectations/get?user_id=${encodeURIComponent(uid)}`);
+          if (!res.ok) return;
+          const v = await res.json();
+          for (const k of ["add_req_min","add_req_max","sub_req_min","sub_req_max","mul_a_req_min","mul_a_req_max","mul_b_req_min","mul_b_req_max"]) {
+            const el = document.getElementById(k);
+            if (el) el.value = v[k];
+          }
+        }
+        const sel = document.getElementById('exp-user-id');
+        sel.addEventListener('change', () => loadExpectations(sel.value));
+        // On first render
+        if (sel.value) loadExpectations(sel.value);
+      </script>
     {% endif %}
   </section>
 </div>

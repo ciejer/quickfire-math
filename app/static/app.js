@@ -100,6 +100,18 @@ function renderHeatmap(el, data, labelStart = 1, labelEnd = 12) {
   el.innerHTML = html;
 }
 
+// --- Login page: click a name => submit immediately
+function initLogin() {
+  const form = document.getElementById("login-form");
+  if (!form) return;
+  form.addEventListener("click", (e) => {
+    const label = e.target.closest(".op-card");
+    if (!label) return;
+    const input = label.querySelector("input[type=radio]");
+    if (input) { input.checked = true; form.submit(); }
+  });
+}
+
 // --- Chooser page
 function initHome() {
   const opCards = Array.from(document.querySelectorAll(".op-card input[type=radio]"));
@@ -127,13 +139,19 @@ function initHome() {
   fetchFeed().then((f) => renderFeed(feedList, f.items));
 
   const repMul = document.getElementById("report-mul");
-  fetchReportMul().then((d) => renderHeatmap(repMul, d, 1, 12));
-
   const repAdd = document.getElementById("report-add");
-  fetchReportAdd().then((d) => renderHeatmap(repAdd, d, d?.labels_from ?? 0, d?.labels_to ?? 20));
-
   const repSub = document.getElementById("report-sub");
-  fetchReportSub().then((d) => renderHeatmap(repSub, d, d?.labels_from ?? 0, d?.labels_to ?? 20));
+  // Only fetch reports when the details are opened (saves work)
+  document.querySelectorAll("details.expander").forEach((d) => {
+    d.addEventListener("toggle", async () => {
+      if (d.open && d.querySelector("#report-mul") && !d.dataset.loaded) {
+        d.dataset.loaded = "1";
+        fetch("/report/multiplication").then(r=>r.json()).then((data)=>renderHeatmap(repMul, data, 1, 12));
+        fetch("/report/addition").then(r=>r.json()).then((data)=>renderHeatmap(repAdd, data, data?.labels_from ?? 0, data?.labels_to ?? 20));
+        fetch("/report/subtraction").then(r=>r.json()).then((data)=>renderHeatmap(repSub, data, data?.labels_from ?? 0, data?.labels_to ?? 20));
+      }
+    });
+  });
 }
 
 // --- Drill page
@@ -243,7 +261,7 @@ function initDrill() {
       ding();
       qlog.push({ prompt: current.prompt, a: +parsed.a, b: +parsed.b, correct_answer: current.answer, given_answer: val, correct: true, started_at: currentStart.toISOString(), elapsed_ms: elapsed });
       done += 1;
-      qDoneEl.textContent = String(done);
+      document.getElementById("q-done").textContent = String(done);
       if (done >= drill.target) { await finish(); return; }
       await topUpQueue(); showCurrent();
     } else {
@@ -265,6 +283,7 @@ function initDrill() {
 
 // Boot
 document.addEventListener("DOMContentLoaded", () => {
+  initLogin();
   if (document.getElementById("choose-form")) initHome();
   if (window.DRILL) initDrill();
 });
