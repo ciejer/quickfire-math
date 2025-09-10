@@ -3,6 +3,7 @@
 <div class="layout">
   <section class="main-col" style="grid-column: 1 / span 2;">
     <h1 class="title">Who’s playing?</h1>
+
     <form method="post" action="/login" class="op-cards">
       {% for u in users %}
         <label class="op-card">
@@ -14,7 +15,14 @@
         <button class="primary" type="submit">Continue</button>
       </div>
     </form>
-    <p class="note"><a href="/admin">Manager console</a></p>
+
+    <h2 style="margin-top:18px;">New here?</h2>
+    <form method="post" action="/user/add" class="row">
+      <input type="text" name="display_name" placeholder="Your name" required>
+      <button class="primary">Add and start</button>
+    </form>
+
+    <p class="note" style="margin-top:10px;"><a href="/admin">Manager console</a></p>
   </section>
 </div>
 {% endblock %}

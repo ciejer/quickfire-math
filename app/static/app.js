@@ -43,6 +43,8 @@ async function fetchNext(type) {
 async function fetchFeed() { const r = await fetch("/feed"); return r.ok ? r.json() : { items: [] }; }
 async function fetchStats() { const tz = new Date().getTimezoneOffset(); const r = await fetch(`/stats?tz_offset=${encodeURIComponent(tz)}`); return r.ok ? r.json() : null; }
 async function fetchReportMul() { const r = await fetch("/report/multiplication"); return r.ok ? r.json() : null; }
+async function fetchReportAdd() { const r = await fetch("/report/addition"); return r.ok ? r.json() : null; }
+async function fetchReportSub() { const r = await fetch("/report/subtraction"); return r.ok ? r.json() : null; }
 
 // Rendering
 function renderFeed(container, items) {
@@ -68,22 +70,29 @@ function renderStats(listEl, stats) {
     <li>Division: <strong>${stats.division}</strong></li>`;
 }
 
-function renderMulHeatmap(el, data) {
+function renderHeatmap(el, data, labelStart = 1, labelEnd = 12) {
   if (!el || !data || !data.grid) return;
   const g = data.grid;
-  let html = `<div class="hm"><div class="hm-row hm-head"><span></span>${Array.from({length:12},(_,i)=>`<span>${i+1}</span>`).join("")}</div>`;
-  for (let a=1;a<=12;a++) {
+  const from = data.labels_from ?? labelStart;
+  const to = data.labels_to ?? labelEnd;
+
+  const cols = (to - from + 1);
+  let header = `<div class="hm-row hm-head"><span></span>`;
+  for (let x=from; x<=to; x++) header += `<span>${x}</span>`;
+  header += `</div>`;
+
+  let html = `<div class="hm">${header}`;
+  for (let a=from; a<=to; a++) {
     html += `<div class="hm-row"><span class="hm-headcell">${a}</span>`;
-    for (let b=1;b<=12;b++) {
-      const v = g[a][b];
-      // darker red = worse (higher score). null = no data (dim)
+    for (let b=from; b<=to; b++) {
+      const v = (g[a] && g[a][b] !== undefined) ? g[a][b] : null;
       let bg = "rgba(255,255,255,0.06)";
       if (v !== null) {
         const clamped = Math.max(0, Math.min(1, v));
         const alpha = 0.15 + clamped*0.65;
-        bg = `rgba(255, 80, 80, ${alpha})`;
+        bg = `rgba(255, 80, 80, ${alpha})`; // red = needs work
       }
-      html += `<span class="hm-cell" title="${a}×${b}" style="background:${bg}"></span>`;
+      html += `<span class="hm-cell" title="${a},${b}" style="background:${bg}"></span>`;
     }
     html += `</div>`;
   }
@@ -117,8 +126,14 @@ function initHome() {
   const feedList = document.getElementById("feed-list");
   fetchFeed().then((f) => renderFeed(feedList, f.items));
 
-  const rep = document.getElementById("report-mul");
-  fetchReportMul().then((d) => renderMulHeatmap(rep, d));
+  const repMul = document.getElementById("report-mul");
+  fetchReportMul().then((d) => renderHeatmap(repMul, d, 1, 12));
+
+  const repAdd = document.getElementById("report-add");
+  fetchReportAdd().then((d) => renderHeatmap(repAdd, d, d?.labels_from ?? 0, d?.labels_to ?? 20));
+
+  const repSub = document.getElementById("report-sub");
+  fetchReportSub().then((d) => renderHeatmap(repSub, d, d?.labels_from ?? 0, d?.labels_to ?? 20));
 }
 
 // --- Drill page
@@ -138,7 +153,6 @@ function renderEquationFromPrompt(prompt) {
     op.textContent = parts.op;
   }
 }
-
 function insertWithin(arr, item, minAhead = 3, maxAhead = 5) {
   const pos = Math.min(arr.length, Math.floor(Math.random() * (maxAhead - minAhead + 1)) + minAhead);
   arr.splice(pos, 0, item);
@@ -151,7 +165,6 @@ function initDrill() {
   const ansEl = document.getElementById("answer");
   const formEl = document.getElementById("answer-form");
   const qDoneEl = document.getElementById("q-done");
-  const qTotalEl = document.getElementById("q-total");
   const timerEl = document.getElementById("timer");
   const finishActions = document.getElementById("finish-actions");
   const overlay = document.getElementById("overlay");
@@ -205,18 +218,15 @@ function initDrill() {
     fd.set("qlog", JSON.stringify(qlog));
     await fetch("/finish", { method: "POST", body: fd });
 
-    // UI
     document.getElementById("equation").classList.add("finished");
     formEl.classList.add("hidden");
     finishActions.classList.remove("hidden");
 
-    // Sidebar refresh
     fetchStats().then((s) => renderStats(document.getElementById("stats-list"), s));
     fetchFeed().then((f) => renderFeed(document.getElementById("feed-list"), f.items));
 
-    // Helper banner
     const helper = document.getElementById("helper");
-    helper.textContent = `Nice one! Time: ${fmtTime(elapsed)} • Score ${correctFirstTry}/${drill.target}`;
+    helper.textContent = `Nice one! Time: ${fmtTime(elapsed)} • Score ${correctFirstTry}/20`;
   }
 
   formEl.addEventListener("submit", async (e) => {
@@ -231,55 +241,23 @@ function initDrill() {
 
     if (val === current.answer) {
       ding();
-      // log
-      qlog.push({
-        prompt: current.prompt,
-        a: parseInt(parsed.a,10), b: parseInt(parsed.b,10),
-        correct_answer: current.answer,
-        given_answer: val,
-        correct: true,
-        started_at: currentStart.toISOString(),
-        elapsed_ms: elapsed
-      });
-
+      qlog.push({ prompt: current.prompt, a: +parsed.a, b: +parsed.b, correct_answer: current.answer, given_answer: val, correct: true, started_at: currentStart.toISOString(), elapsed_ms: elapsed });
       done += 1;
       qDoneEl.textContent = String(done);
       if (done >= drill.target) { await finish(); return; }
-      await topUpQueue();
-      showCurrent();
+      await topUpQueue(); showCurrent();
     } else {
-      misses += 1;
-      say(current.tts);
-
-      // log
-      qlog.push({
-        prompt: current.prompt,
-        a: parseInt(parsed.a,10), b: parseInt(parsed.b,10),
-        correct_answer: current.answer,
-        given_answer: val,
-        correct: false,
-        started_at: currentStart.toISOString(),
-        elapsed_ms: elapsed
-      });
-
-      // Visual overlay for 3s
-      if (parsed) {
-        overlayContent.textContent = `${parsed.a} ${parsed.op} ${parsed.b} = ${current.answer}`;
-        overlay.classList.remove("hidden");
-      }
+      misses += 1; say(current.tts);
+      qlog.push({ prompt: current.prompt, a: +parsed.a, b: +parsed.b, correct_answer: current.answer, given_answer: val, correct: false, started_at: currentStart.toISOString(), elapsed_ms: elapsed });
+      overlayContent.textContent = `${parsed.a} ${parsed.op} ${parsed.b} = ${current.answer}`;
+      overlay.classList.remove("hidden");
       insertWithin(queue, current, 3, 5);
       await topUpQueue();
-
       formEl.classList.add("disabled");
-      setTimeout(() => {
-        overlay.classList.add("hidden");
-        formEl.classList.remove("disabled");
-        showCurrent();
-      }, 3000);
+      setTimeout(() => { overlay.classList.add("hidden"); formEl.classList.remove("disabled"); showCurrent(); }, 3000);
     }
   });
 
-  // Initial render & focus
   renderEquationFromPrompt(queue[0].prompt);
   topUpQueue();
   ansEl.focus();

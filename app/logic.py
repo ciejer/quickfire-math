@@ -51,10 +51,9 @@ def generate_problem(op: str, s: UserSettings) -> Problem:
 
     if op == "division":
         divisor = _rand(s.div_divisor_min, s.div_divisor_max) or 1
-        max_q = max(1, min(12, s.div_dividend_max // divisor))
-        quotient = _rand(1, max_q)
-        dividend = divisor * quotient
-        ans = quotient
+        q = _rand(max(1, s.div_q_min), max(1, s.div_q_max))
+        dividend = divisor * q
+        ans = q
         return (f"{dividend} ÷ {divisor}", ans, _tts_for(op, dividend, divisor, ans))
 
     raise ValueError("Unsupported op")
@@ -68,6 +67,5 @@ def human_settings(op: str, s: UserSettings) -> str:
     if op == "multiplication":
         return f"Multiply: A {s.mul_a_min}–{s.mul_a_max}, B {s.mul_b_min}–{s.mul_b_max}"
     if op == "division":
-        q_hi = min(12, s.div_dividend_max // max(1, s.div_divisor_min))
-        return f"Divide: divisor {s.div_divisor_min}–{s.div_divisor_max}, quotient ≤ {q_hi}"
+        return f"Divide: divisor {s.div_divisor_min}–{s.div_divisor_max}, quotient {s.div_q_min}–{s.div_q_max}"
     return ""

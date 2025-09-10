@@ -7,7 +7,7 @@
       <a class="muted-link" href="/">← Back</a>
     </div>
 
-    <!-- Choose a drill -->
+    <!-- Choose a drill (always 20 Qs) -->
     <form method="post" action="/start" class="chooser" id="choose-form">
       <label>Choose a drill</label>
       <div class="op-cards">
@@ -59,7 +59,8 @@
         <legend>Division</legend>
         <label><input type="checkbox" name="div_enabled" {% if st.div_enabled %}checked{% endif %}> Enabled</label>
         <div class="row">
-          <label>Largest dividend <input type="number" name="div_dividend_max" value="{{ st.div_dividend_max }}"></label>
+          <label>Quotient min <input type="number" name="div_q_min" value="{{ st.div_q_min }}"></label>
+          <label>Quotient max <input type="number" name="div_q_max" value="{{ st.div_q_max }}"></label>
         </div>
         <div class="row">
           <label>Divisor min <input type="number" name="div_divisor_min" value="{{ st.div_divisor_min }}"></label>
@@ -75,7 +76,12 @@
 
     <!-- Performance -->
     <h2>Recent performance</h2>
+    <h3>Multiplication</h3>
     <div id="report-mul" class="heatmap"></div>
+    <h3>Addition (0–20)</h3>
+    <div id="report-add" class="heatmap"></div>
+    <h3>Subtraction (0–20, larger − smaller)</h3>
+    <div id="report-sub" class="heatmap"></div>
   </section>
 
   <aside class="news-col">
@@ -105,7 +111,7 @@
   </aside>
 
   <script>
-    // Save settings via fetch (so we can show friendly validation errors)
+    // Save settings via fetch to surface validation messages
     document.getElementById('save-settings').addEventListener('click', async () => {
       const form = document.getElementById('settings-form');
       const msg = document.getElementById('save-msg');

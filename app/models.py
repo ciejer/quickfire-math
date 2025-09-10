@@ -39,9 +39,10 @@ class UserSettings(SQLModel, table=True):
     mul_b_min: int = 1
     mul_b_max: int = 12
 
-    # Division (kept schema, friendly defaults)
+    # Division (new: quotient min/max + divisor min/max)
     div_enabled: bool = True
-    div_dividend_max: int = 144
+    div_q_min: int = 1
+    div_q_max: int = 12
     div_divisor_min: int = 1
     div_divisor_max: int = 12
 
@@ -72,8 +73,7 @@ class DrillQuestion(SQLModel, table=True):
 
 class AdminConfig(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    # Stored in plaintext per your spec so it can be re-printed each boot
-    admin_password_plain: str
+    admin_password_plain: str  # printed to logs on boot (per spec)
 
 
 class MinExpectations(SQLModel, table=True):
@@ -92,4 +92,4 @@ class MinExpectations(SQLModel, table=True):
     mul_b_req_min: int = 1
     mul_b_req_max: int = 7
 
-    # (Division left for later once quotient limits are added)
+    # Division: we can extend later if you want reqs for quotient/divisor too

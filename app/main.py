@@ -21,7 +21,6 @@ BASE_DIR = os.path.dirname(__file__)
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")
 
-
 # --- Admin password generation (plaintext by spec)
 _WORDS = [
     "tui","kiwi","pohutukawa","harbour","beach","waka","kauri","ponga","kepler","southern",
@@ -31,10 +30,8 @@ _WORDS = [
     "tuatara","alpine","peak","shell","stone","fern","drift","breeze","chord","rhythm",
     "swift","clever","brave","steady","calm","bright","kind","solid","focused","nimble",
 ]
-
 def _generate_admin_password() -> str:
     return f"{random.choice(_WORDS)}-{random.choice(_WORDS)}-{secrets.randbelow(100)}"
-
 
 @app.on_event("startup")
 def startup():
@@ -53,19 +50,15 @@ def startup():
         else:
             print(f"[Koiahi] Admin password: {cfg.admin_password_plain}")
 
-
 def get_user_id(request: Request) -> int | None:
     v = request.cookies.get("uid")
     return int(v) if v and v.isdigit() else None
 
-
 def is_admin(request: Request) -> bool:
     return request.cookies.get("admin") == "1"
 
-
 def _iso_z(dt: datetime) -> str:
     return dt.isoformat() + "Z"
-
 
 # --- Pages
 
@@ -75,13 +68,26 @@ def login(request: Request):
         users = list(s.exec(select(User)).all())
     return templates.TemplateResponse("login.html", {"request": request, "users": users, "app_name": APP_NAME})
 
-
 @app.post("/login")
 def do_login(user_id: int = Form(...)):
     resp = RedirectResponse(url="/home", status_code=303)
     resp.set_cookie("uid", str(user_id), max_age=60 * 60 * 24 * 365)
     return resp
 
+@app.post("/user/add")
+def user_add(display_name: str = Form(...)):
+    name = display_name.strip()
+    if not name:
+        return RedirectResponse("/", status_code=303)
+    with get_session() as s:
+        u = User(display_name=name)
+        s.add(u); s.commit(); s.refresh(u)
+        s.add(UserSettings(user_id=u.id))
+        s.commit()
+    # auto-login the new user
+    resp = RedirectResponse(url="/home", status_code=303)
+    resp.set_cookie("uid", str(u.id), max_age=60 * 60 * 24 * 365)
+    return resp
 
 @app.get("/home", response_class=HTMLResponse)
 def home(request: Request):
@@ -107,7 +113,6 @@ def home(request: Request):
         "request": request, "user": user, "st": st, "drills": drills, "mins": mins
     })
 
-
 @app.post("/settings/update")
 def update_settings(
     request: Request,
@@ -124,7 +129,8 @@ def update_settings(
     mul_b_min: int = Form(...),
     mul_b_max: int = Form(...),
     div_enabled: bool = Form(False),
-    div_dividend_max: int = Form(...),
+    div_q_min: int = Form(...),
+    div_q_max: int = Form(...),
     div_divisor_min: int = Form(...),
     div_divisor_max: int = Form(...),
 ):
@@ -132,21 +138,18 @@ def update_settings(
     with get_session() as s:
         mins = s.exec(select(MinExpectations).where(MinExpectations.user_id == user_id)).first()
         if mins:
-            # Addition inclusion
             if add_enabled and not (add_min <= mins.add_req_min and add_max >= mins.add_req_max):
                 return PlainTextResponse(
                     "Kia kaha! Please include at least the required addition range "
                     f"{mins.add_req_min}–{mins.add_req_max}. You’ve got this!",
                     status_code=400
                 )
-            # Subtraction inclusion
             if sub_enabled and not (sub_min <= mins.sub_req_min and sub_max >= mins.sub_req_max):
                 return PlainTextResponse(
                     "Ka pai—nearly there. Make sure subtraction includes at least "
                     f"{mins.sub_req_min}–{mins.sub_req_max}.",
                     status_code=400
                 )
-            # Multiplication inclusion (both factors)
             if mul_enabled:
                 if not (mul_a_min <= mins.mul_a_req_min and mul_a_max >= mins.mul_a_req_max):
                     return PlainTextResponse(
@@ -172,13 +175,12 @@ def update_settings(
         st.mul_a_min = mul_a_min; st.mul_a_max = mul_a_max
         st.mul_b_min = mul_b_min; st.mul_b_max = mul_b_max
         st.div_enabled = div_enabled
-        st.div_dividend_max = div_dividend_max
+        st.div_q_min = div_q_min; st.div_q_max = div_q_max
         st.div_divisor_min = div_divisor_min; st.div_divisor_max = div_divisor_max
 
         s.add(st); s.commit()
 
     return PlainTextResponse("ok")
-
 
 @app.post("/start")
 def start_drill(request: Request, drill_type: DrillTypeEnum = Form(...)):
@@ -214,7 +216,6 @@ def start_drill(request: Request, drill_type: DrillTypeEnum = Form(...)):
         },
     )
 
-
 @app.post("/next")
 def next_problem(request: Request, drill_type: DrillTypeEnum = Form(...)):
     uid = get_user_id(request)
@@ -226,7 +227,6 @@ def next_problem(request: Request, drill_type: DrillTypeEnum = Form(...)):
         raise HTTPException(404)
     p, a, tts = generate_problem(drill_type.value, st)
     return JSONResponse({"prompt": p, "answer": a, "tts": tts})
-
 
 @app.post("/finish")
 def finish_drill(
@@ -257,7 +257,6 @@ def finish_drill(
         except Exception:
             logs = []
 
-        # Persist per-question logs
         for entry in logs:
             dq = DrillQuestion(
                 drill_result_id=rec.id,
@@ -275,7 +274,6 @@ def finish_drill(
         s.commit()
 
     return JSONResponse({"ok": True})
-
 
 @app.get("/feed")
 def feed(request: Request, limit: int = 20):
@@ -299,7 +297,6 @@ def feed(request: Request, limit: int = 20):
         for d in drills
     ]
     return JSONResponse({"items": items})
-
 
 @app.get("/stats")
 def stats(request: Request, tz_offset: int = 0):
@@ -328,19 +325,18 @@ def stats(request: Request, tz_offset: int = 0):
             counts[t] += 1
     return JSONResponse(counts)
 
+# --- Reports
 
 @app.get("/report/multiplication")
 def report_multiplication(request: Request):
     uid = get_user_id(request)
     if not uid:
         raise HTTPException(403)
-    # Aggregate last 500 questions for heatmap
     with get_session() as s:
         rows = s.exec(
             select(DrillQuestion)
-            .where(DrillQuestion.drill_type == DrillTypeEnum.multiplication)
+            .where(DrillQuestion.drill_type == DrillTypeEnum.multiplication, DrillQuestion.drill_result_id != None)
         ).all()
-    # Build 1..12 x 1..12 grid: score = (1-accuracy) + time penalty
     grid = [[None for _ in range(13)] for _ in range(13)]
     stats = {}
     for r in rows:
@@ -357,10 +353,83 @@ def report_multiplication(request: Request):
             else:
                 wrong = stats[(a,b)]["wrong"]
                 ms = stats[(a,b)]["ms"] / n
-                # composite: more wrong + slower => larger score (worse)
                 score = wrong / n + min(ms/4000, 1.0) * 0.6
                 grid[a][b] = score
     return JSONResponse({"grid": grid})
+
+@app.get("/report/addition")
+def report_addition(request: Request):
+    uid = get_user_id(request)
+    if not uid:
+        raise HTTPException(403)
+    # Use 0..20 grid for both operands
+    maxn = 20
+    with get_session() as s:
+        rows = s.exec(
+            select(DrillQuestion)
+            .where(DrillQuestion.drill_type == DrillTypeEnum.addition)
+        ).all()
+    grid = [[None for _ in range(maxn+1)] for _ in range(maxn+1)]
+    stats = {}
+    for r in rows:
+        a = min(maxn, max(0, r.a)); b = min(maxn, max(0, r.b))
+        key = (a,b)
+        acc = stats.setdefault(key, {"n":0, "wrong":0, "ms":0})
+        acc["n"] += 1
+        acc["wrong"] += 0 if r.correct else 1
+        acc["ms"] += r.elapsed_ms
+    for a in range(0,maxn+1):
+        for b in range(0,maxn+1):
+            n = stats.get((a,b), {}).get("n", 0)
+            if n == 0:
+                grid[a][b] = None
+            else:
+                wrong = stats[(a,b)]["wrong"]
+                ms = stats[(a,b)]["ms"] / n
+                # bigger sums are a bit harder; add a tiny weight to (a+b)
+                diff = (a + b) / (maxn*2)
+                score = wrong / n + min(ms/3500, 1.0) * 0.6 + diff * 0.2
+                grid[a][b] = score
+    return JSONResponse({"grid": grid, "labels_from": 0, "labels_to": maxn})
+
+@app.get("/report/subtraction")
+def report_subtraction(request: Request):
+    uid = get_user_id(request)
+    if not uid:
+        raise HTTPException(403)
+    maxn = 20
+    with get_session() as s:
+        rows = s.exec(
+            select(DrillQuestion)
+            .where(DrillQuestion.drill_type == DrillTypeEnum.subtraction)
+        ).all()
+    grid = [[None for _ in range(maxn+1)] for _ in range(maxn+1)]
+    stats = {}
+    for r in rows:
+        # store as (larger, smaller) to match how we pose subtraction
+        a = max(r.a, r.b); b = min(r.a, r.b)
+        a = min(maxn, max(0, a)); b = min(maxn, max(0, b))
+        key = (a,b)
+        acc = stats.setdefault(key, {"n":0, "wrong":0, "ms":0})
+        acc["n"] += 1
+        acc["wrong"] += 0 if r.correct else 1
+        acc["ms"] += r.elapsed_ms
+    for a in range(0,maxn+1):
+        for b in range(0,maxn+1):
+            n = stats.get((a,b), {}).get("n", 0)
+            if n == 0:
+                grid[a][b] = None
+            else:
+                wrong = stats[(a,b)]["wrong"]
+                ms = stats[(a,b)]["ms"] / n
+                # larger gaps might be trickier; add small weight to (a-b)
+                gap = (a - b) / maxn if a >= b else 0
+                score = wrong / n + min(ms/3500, 1.0) * 0.6 + gap * 0.2
+                grid[a][b] = score
+    return JSONResponse({"grid": grid, "labels_from": 0, "labels_to": maxn})
+
+# --- Admin console
+
 @app.get("/admin", response_class=HTMLResponse)
 def admin_page(request: Request):
     with get_session() as s:
