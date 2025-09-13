@@ -1,19 +1,21 @@
-<!doctype html>
-<html lang="en" data-theme="light">
+<!DOCTYPE html>
+<html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>{{ app_name if app_name is defined else "Quickfire Math" }}</title>
-  <link rel="icon" href="/static/favicon.svg">
+  <title>{{ app_name or "Quickfire Math" }}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b1020">
   <link rel="stylesheet" href="/static/styles.css">
-  <script defer src="/static/app.js"></script>
 </head>
 <body>
   <header class="site-header">
-    <div class="brand">Quickfire Math</div>
+    <div class="wrap">
+      <span class="brand">{{ app_name or "Quickfire Math" }}</span>
+    </div>
   </header>
   <main class="wrap">
     {% block content %}{% endblock %}
   </main>
+  <script src="/static/app.js"></script>
 </body>
 </html>

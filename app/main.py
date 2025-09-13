@@ -330,13 +330,17 @@ def stats(request: Request, tz_offset: int = 0):
 @app.get("/report/multiplication")
 def report_multiplication(request: Request):
     uid = get_user_id(request)
-    if not uid:
-        raise HTTPException(403)
+    if not uid: raise HTTPException(403)
     with get_session() as s:
         rows = s.exec(
             select(DrillQuestion)
-            .where(DrillQuestion.drill_type == DrillTypeEnum.multiplication, DrillQuestion.drill_result_id != None)
+            .join(DrillResult, DrillQuestion.drill_result_id == DrillResult.id)
+            .where(
+                DrillResult.user_id == uid,
+                DrillQuestion.drill_type == DrillTypeEnum.multiplication
+            )
         ).all()
+
     grid = [[None for _ in range(13)] for _ in range(13)]
     stats = {}
     for r in rows:
@@ -345,6 +349,7 @@ def report_multiplication(request: Request):
         acc["n"] += 1
         acc["wrong"] += 0 if r.correct else 1
         acc["ms"] += r.elapsed_ms
+
     for a in range(1,13):
         for b in range(1,13):
             n = stats.get((a,b), {}).get("n", 0)
@@ -360,15 +365,18 @@ def report_multiplication(request: Request):
 @app.get("/report/addition")
 def report_addition(request: Request):
     uid = get_user_id(request)
-    if not uid:
-        raise HTTPException(403)
-    # Use 0..20 grid for both operands
+    if not uid: raise HTTPException(403)
     maxn = 20
     with get_session() as s:
         rows = s.exec(
             select(DrillQuestion)
-            .where(DrillQuestion.drill_type == DrillTypeEnum.addition)
+            .join(DrillResult, DrillQuestion.drill_result_id == DrillResult.id)
+            .where(
+                DrillResult.user_id == uid,
+                DrillQuestion.drill_type == DrillTypeEnum.addition
+            )
         ).all()
+
     grid = [[None for _ in range(maxn+1)] for _ in range(maxn+1)]
     stats = {}
     for r in rows:
@@ -378,6 +386,7 @@ def report_addition(request: Request):
         acc["n"] += 1
         acc["wrong"] += 0 if r.correct else 1
         acc["ms"] += r.elapsed_ms
+
     for a in range(0,maxn+1):
         for b in range(0,maxn+1):
             n = stats.get((a,b), {}).get("n", 0)
@@ -386,7 +395,6 @@ def report_addition(request: Request):
             else:
                 wrong = stats[(a,b)]["wrong"]
                 ms = stats[(a,b)]["ms"] / n
-                # bigger sums are a bit harder; add a tiny weight to (a+b)
                 diff = (a + b) / (maxn*2)
                 score = wrong / n + min(ms/3500, 1.0) * 0.6 + diff * 0.2
                 grid[a][b] = score
@@ -395,18 +403,21 @@ def report_addition(request: Request):
 @app.get("/report/subtraction")
 def report_subtraction(request: Request):
     uid = get_user_id(request)
-    if not uid:
-        raise HTTPException(403)
+    if not uid: raise HTTPException(403)
     maxn = 20
     with get_session() as s:
         rows = s.exec(
             select(DrillQuestion)
-            .where(DrillQuestion.drill_type == DrillTypeEnum.subtraction)
+            .join(DrillResult, DrillQuestion.drill_result_id == DrillResult.id)
+            .where(
+                DrillResult.user_id == uid,
+                DrillQuestion.drill_type == DrillTypeEnum.subtraction
+            )
         ).all()
+
     grid = [[None for _ in range(maxn+1)] for _ in range(maxn+1)]
     stats = {}
     for r in rows:
-        # store as (larger, smaller) to match how we pose subtraction
         a = max(r.a, r.b); b = min(r.a, r.b)
         a = min(maxn, max(0, a)); b = min(maxn, max(0, b))
         key = (a,b)
@@ -414,6 +425,7 @@ def report_subtraction(request: Request):
         acc["n"] += 1
         acc["wrong"] += 0 if r.correct else 1
         acc["ms"] += r.elapsed_ms
+
     for a in range(0,maxn+1):
         for b in range(0,maxn+1):
             n = stats.get((a,b), {}).get("n", 0)
@@ -422,7 +434,6 @@ def report_subtraction(request: Request):
             else:
                 wrong = stats[(a,b)]["wrong"]
                 ms = stats[(a,b)]["ms"] / n
-                # larger gaps might be trickier; add small weight to (a-b)
                 gap = (a - b) / maxn if a >= b else 0
                 score = wrong / n + min(ms/3500, 1.0) * 0.6 + gap * 0.2
                 grid[a][b] = score

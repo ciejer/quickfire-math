@@ -9,6 +9,26 @@ function fmtTime(ms) {
 const audioCtx =
   typeof window !== "undefined" && "AudioContext" in window ? new AudioContext() : null;
 
+// --- Mobile/media unlock (iOS/Android)
+let mediaUnlocked = false;
+function unlockMediaOnce() {
+  if (mediaUnlocked) return;
+  try { if (audioCtx && audioCtx.state === "suspended") audioCtx.resume(); } catch {}
+  try {
+    if ("speechSynthesis" in window) {
+      // Touch voices so mobile loads them (no audible output)
+      const _ = speechSynthesis.getVoices();
+      // Some browsers only populate voices after this event fires once
+      speechSynthesis.onvoiceschanged = () => {};
+    }
+  } catch {}
+  mediaUnlocked = true;
+}
+["touchstart", "pointerdown", "mousedown", "keydown", "click"].forEach((evt) => {
+  window.addEventListener(evt, unlockMediaOnce, { once: true, passive: true });
+});
+
+// Simple tone synth
 function tone(freq, dur = 0.12, gain = 0.04, when = 0) {
   if (!audioCtx) return;
   const o = audioCtx.createOscillator();
@@ -21,16 +41,22 @@ function tone(freq, dur = 0.12, gain = 0.04, when = 0) {
   o.start(audioCtx.currentTime + when);
   o.stop(audioCtx.currentTime + when + dur);
 }
-
 function ding() { tone(880, 0.08, 0.06); }
 function winSound() { [523.25, 659.25, 783.99].forEach((f, i) => tone(f, 0.15, 0.05, i * 0.1)); }
 
+// Speech
 function say(text) {
   if (!window.speechSynthesis) return;
-  const u = new SpeechSynthesisUtterance(text);
-  u.rate = 1.05;
-  speechSynthesis.cancel();
-  speechSynthesis.speak(u);
+  try {
+    const u = new SpeechSynthesisUtterance(text);
+    u.rate = 1.05;
+    u.pitch = 1.0;
+    // Prefer en-NZ if available (falls back automatically otherwise)
+    const enNZ = speechSynthesis.getVoices().find(v => /en[-_]NZ/i.test(v.lang));
+    if (enNZ) u.voice = enNZ;
+    speechSynthesis.cancel();
+    speechSynthesis.speak(u);
+  } catch {}
 }
 
 // API
@@ -46,7 +72,7 @@ async function fetchReportMul() { const r = await fetch("/report/multiplication"
 async function fetchReportAdd() { const r = await fetch("/report/addition"); return r.ok ? r.json() : null; }
 async function fetchReportSub() { const r = await fetch("/report/subtraction"); return r.ok ? r.json() : null; }
 
-// Rendering
+// Rendering — feed & stats
 function renderFeed(container, items) {
   if (!container) return;
   if (!items || !items.length) {
@@ -70,13 +96,13 @@ function renderStats(listEl, stats) {
     <li>Division: <strong>${stats.division}</strong></li>`;
 }
 
+// Rendering — heatmaps
 function renderHeatmap(el, data, labelStart = 1, labelEnd = 12) {
   if (!el || !data || !data.grid) return;
   const g = data.grid;
   const from = data.labels_from ?? labelStart;
   const to = data.labels_to ?? labelEnd;
 
-  const cols = (to - from + 1);
   let header = `<div class="hm-row hm-head"><span></span>`;
   for (let x=from; x<=to; x++) header += `<span>${x}</span>`;
   header += `</div>`;
@@ -138,27 +164,32 @@ function initHome() {
   const feedList = document.getElementById("feed-list");
   fetchFeed().then((f) => renderFeed(feedList, f.items));
 
+  // Fetch reports only when expanded
   const repMul = document.getElementById("report-mul");
   const repAdd = document.getElementById("report-add");
   const repSub = document.getElementById("report-sub");
-  // Only fetch reports when the details are opened (saves work)
   document.querySelectorAll("details.expander").forEach((d) => {
     d.addEventListener("toggle", async () => {
       if (d.open && d.querySelector("#report-mul") && !d.dataset.loaded) {
         d.dataset.loaded = "1";
-        fetch("/report/multiplication").then(r=>r.json()).then((data)=>renderHeatmap(repMul, data, 1, 12));
-        fetch("/report/addition").then(r=>r.json()).then((data)=>renderHeatmap(repAdd, data, data?.labels_from ?? 0, data?.labels_to ?? 20));
-        fetch("/report/subtraction").then(r=>r.json()).then((data)=>renderHeatmap(repSub, data, data?.labels_from ?? 0, data?.labels_to ?? 20));
+        fetchReportMul().then((data)=>renderHeatmap(repMul, data, 1, 12));
+        fetchReportAdd().then((data)=>renderHeatmap(repAdd, data, data?.labels_from ?? 0, data?.labels_to ?? 20));
+        fetchReportSub().then((data)=>renderHeatmap(repSub, data, data?.labels_from ?? 0, data?.labels_to ?? 20));
       }
     });
   });
 }
 
-// --- Drill page
+// --- Drill page helpers
 function parsePrompt(prompt) {
   const m = prompt.match(/^\s*(\d+)\s*([+\u2212\u00D7\u00F7])\s*(\d+)\s*$/);
   if (!m) return null;
   return { a: m[1], op: m[2], b: m[3] };
+}
+function setNumColor(el, n) {
+  el.className = "num";
+  const val = parseInt(n, 10);
+  if (!Number.isNaN(val) && val >= 0 && val <= 12) el.classList.add(`n-${val}`);
 }
 function renderEquationFromPrompt(prompt) {
   const parts = parsePrompt(prompt);
@@ -166,9 +197,8 @@ function renderEquationFromPrompt(prompt) {
   const b = document.getElementById("num-b");
   const op = document.getElementById("op");
   if (parts && a && b && op) {
-    a.textContent = parts.a;
-    b.textContent = parts.b;
-    op.textContent = parts.op;
+    a.textContent = parts.a; b.textContent = parts.b; op.textContent = parts.op;
+    setNumColor(a, parts.a); setNumColor(b, parts.b);
   }
 }
 function insertWithin(arr, item, minAhead = 3, maxAhead = 5) {
@@ -182,7 +212,6 @@ function initDrill() {
 
   const ansEl = document.getElementById("answer");
   const formEl = document.getElementById("answer-form");
-  const qDoneEl = document.getElementById("q-done");
   const timerEl = document.getElementById("timer");
   const finishActions = document.getElementById("finish-actions");
   const overlay = document.getElementById("overlay");
@@ -249,6 +278,8 @@ function initDrill() {
 
   formEl.addEventListener("submit", async (e) => {
     e.preventDefault();
+    unlockMediaOnce();
+
     if (!queue.length) return;
     const current = queue.shift();
     const val = parseInt(ansEl.value, 10);
@@ -267,8 +298,13 @@ function initDrill() {
     } else {
       misses += 1; say(current.tts);
       qlog.push({ prompt: current.prompt, a: +parsed.a, b: +parsed.b, correct_answer: current.answer, given_answer: val, correct: false, started_at: currentStart.toISOString(), elapsed_ms: elapsed });
-      overlayContent.textContent = `${parsed.a} ${parsed.op} ${parsed.b} = ${current.answer}`;
+
+      // Colourised overlay for correction
+      const clsA = (parseInt(parsed.a,10) >=0 && parseInt(parsed.a,10) <= 12) ? ` n-${parsed.a}` : "";
+      const clsB = (parseInt(parsed.b,10) >=0 && parseInt(parsed.b,10) <= 12) ? ` n-${parsed.b}` : "";
+      overlayContent.innerHTML = `<span class="num${clsA}">${parsed.a}</span> <span class="op">${parsed.op}</span> <span class="num${clsB}">${parsed.b}</span> = <span class="num">${current.answer}</span>`;
       overlay.classList.remove("hidden");
+
       insertWithin(queue, current, 3, 5);
       await topUpQueue();
       formEl.classList.add("disabled");
