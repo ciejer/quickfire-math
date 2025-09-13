@@ -49,10 +49,6 @@ function setDigits(el, text) {
   if (!el) return;
   el.innerHTML = digitsToHTML(text);
 }
-function colorizeDigits(container) {
-  if (!container) return;
-  container.innerHTML = digitsToHTML(container.innerHTML);
-}
 
 // --- API
 async function fetchNext(type){ const fd = new FormData(); fd.set("drill_type", type);
@@ -72,7 +68,6 @@ function renderFeed(container, items) {
     const mins = Math.floor(d.elapsed_ms / 60000), secs = Math.floor((d.elapsed_ms / 1000) % 60);
     return `<div class="news-item"><div class="news-time">${fmt(d.ts)}</div><div class="news-settings">${d.settings}</div><div class="news-result">${mins} min ${secs} secs</div></div>`;
   }).join("");
-  colorizeDigits(container);
 }
 function renderStats(listEl, stats) {
   if (!listEl || !stats) return;
@@ -82,7 +77,6 @@ function renderStats(listEl, stats) {
     <li>Subtraction: <strong>${stats.subtraction}</strong></li>
     <li>Multiplication: <strong>${stats.multiplication}</strong></li>
     <li>Division: <strong>${stats.division}</strong></li>`;
-  colorizeDigits(listEl);
 }
 
 // --- heatmap
@@ -103,7 +97,6 @@ function renderHeatmap(el, data, labelStart=1, labelEnd=12) {
   }
   html += `</div>`;
   el.innerHTML = html;
-  colorizeDigits(el);
 }
 
 // --- login: click name to submit
@@ -205,7 +198,7 @@ function initDrill() {
     fetchFeed().then((f)=>renderFeed(document.getElementById("feed-list"), f.items));
 
     const helper = document.getElementById("helper");
-    if (helper) helper.innerHTML = `Nice one! Time: ${digitsToHTML(fmtTime(elapsed))} • Score ${digitsToHTML(`${correctFirstTry}/20`)}`;
+    if (helper) helper.innerHTML = `Nice one! Time: ${fmtTime(elapsed)} • Score ${`${correctFirstTry}/20`}`;
   }
 
   formEl.addEventListener("submit", async (e) => {
