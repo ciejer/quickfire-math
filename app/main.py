@@ -76,17 +76,20 @@ def do_login(user_id: int = Form(...)):
 
 @app.post("/user/add")
 def user_add(display_name: str = Form(...)):
-    name = display_name.strip()
+    """Create a user, create default settings, set login cookie, go to /home."""
+    name = (display_name or "").strip()
     if not name:
         return RedirectResponse("/", status_code=303)
     with get_session() as s:
         u = User(display_name=name)
         s.add(u); s.commit(); s.refresh(u)
+        # Ensure a settings row exists before redirecting
         s.add(UserSettings(user_id=u.id))
         s.commit()
-    # auto-login the new user
+        new_id = u.id
     resp = RedirectResponse(url="/home", status_code=303)
-    resp.set_cookie("uid", str(u.id), max_age=60 * 60 * 24 * 365)
+    # samesite=lax ensures cookie sticks across the redirect
+    resp.set_cookie("uid", str(new_id), max_age=60 * 60 * 24 * 365, samesite="lax")
     return resp
 
 @app.get("/home", response_class=HTMLResponse)
