@@ -104,11 +104,9 @@ def compute_first_try_metrics(qlog: List[dict]) -> dict:
 def star_decision(metrics: dict, total_time_ms: int, target_time_sec: float) -> tuple[bool, dict]:
     """
     Gates:
-      - Accuracy >= A(level)  (A varies by level in thresholds_for_level)
+      - Accuracy >= A (tiered by set size)
       - Total time <= personalised target_time_sec (locked at level start)
     """
-    # accuracy gates vary slowly by level — mirror levels.thresholds_for_level for A-only
-    # We keep it simple by using a tiered accuracy that scales with item count
     items = metrics.get("items", 20) or 20
     if items <= 10:
         A = 0.8
@@ -137,3 +135,14 @@ def is_commutative_op_key(prompt: str) -> str | None:
     a, op, b = int(m.group(1)), m.group(2), int(m.group(3))
     lo, hi = sorted((a, b))
     return f"{op}:{lo},{hi}"
+
+# ----------------- Level-up rule (rolling window) -----------------
+def levelup_decision(stars_recent: str, this_star: bool) -> bool:
+    """
+    Level up when, considering the rolling last-5 window INCLUDING this drill:
+      - at least 3 stars in the last 5, AND
+      - at least 2 stars in the last 3
+    """
+    s = (stars_recent or "")[-5:]
+    s = (s + ("1" if this_star else "0"))[-5:]
+    return this_star and (s.count("1") >= 3) and (s[-3:].count("1") >= 2)
