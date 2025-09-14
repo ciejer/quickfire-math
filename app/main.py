@@ -335,7 +335,7 @@ def need_hint_text(stars_recent: str, this_star: bool) -> str:
                     best = (k, horizon)
         if best:
             k, h = best
-            if k == 1 && h == 1:
+            if k == 1 and h == 1:
                 return "Need a star next round to level up"
             return f"Need {k} of the next {h} rounds to level up"
     return "Get 3 of your last 5 stars to level up"
