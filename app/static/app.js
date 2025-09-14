@@ -9,14 +9,16 @@ function unlockMediaOnce(){ if(mediaUnlocked) return; try{ if(audioCtx&&audioCtx
 function tone(freq,dur=0.12,gain=0.04,when=0){ if(!audioCtx) return; const o=audioCtx.createOscillator(), g=audioCtx.createGain(); o.type="sine"; o.frequency.value=freq; g.gain.value=gain; o.connect(g); g.connect(audioCtx.destination); o.start(audioCtx.currentTime+when); o.stop(audioCtx.currentTime+when+dur); }
 function ding(){ tone(880,0.08,0.06); }
 function winSound(){ [523.25,659.25,783.99].forEach((f,i)=>tone(f,0.15,0.05,i*0.1)); }
+function starSound(){ [659.25,783.99,987.77,1318.51].forEach((f,i)=>tone(f,0.12,0.06,i*0.08)); } // 🎉
+function levelUpSound(){ [392,523.25,659.25,783.99,1046.5].forEach((f,i)=>tone(f,0.18,0.06,i*0.12)); } // bigger 🎉
 function say(text){ if(!window.speechSynthesis) return; try{ const u=new SpeechSynthesisUtterance(text); u.rate=1.05; u.pitch=1.0; const enNZ=speechSynthesis.getVoices().find(v=>/en[-_]NZ/i.test(v.lang)); if(enNZ) u.voice=enNZ; speechSynthesis.cancel(); speechSynthesis.speak(u);}catch{} }
 
-// digit colouring — ONLY for operands & wrong-answer overlay
+// digit colouring — ONLY operands & wrong-answer overlay
 function digitsToHTML(str){ return String(str).replace(/\d/g,d=>`<span class="digit d${d}">${d}</span>`); }
 function setDigits(el,text){ if(el) el.innerHTML = digitsToHTML(text); }
 
 // API
-async function apiNext(type, avoid){ const fd=new FormData(); fd.set("drill_type",type); if(avoid) fd.set("avoid_prompt", avoid); const r=await fetch("/next",{method:"POST",body:fd}); if(!r.ok) throw new Error("next failed"); return r.json(); }
+async function apiNext(type, avoid, avoidPair){ const fd=new FormData(); fd.set("drill_type",type); if(avoid) fd.set("avoid_prompt", avoid); if(avoidPair) fd.set("avoid_pair", avoidPair); const r=await fetch("/next",{method:"POST",body:fd}); if(!r.ok) throw new Error("next failed"); return r.json(); }
 async function apiFeed(){ const r=await fetch("/feed"); return r.ok? r.json(): {items:[]}; }
 async function apiStats(){ const tz=new Date().getTimezoneOffset(); const r=await fetch(`/stats?tz_offset=${encodeURIComponent(tz)}`); return r.ok? r.json(): null; }
 async function apiProg(){ const r=await fetch("/progress"); return r.ok? r.json(): null; }
@@ -24,14 +26,27 @@ async function apiReportMul(){ const r=await fetch("/report/multiplication"); re
 async function apiReportAdd(){ const r=await fetch("/report/addition"); return r.ok? r.json(): null; }
 async function apiReportSub(){ const r=await fetch("/report/subtraction"); return r.ok? r.json(): null; }
 
+// commutative key for duplicate avoidance (+, ×)
+function commKey(prompt){ const m=prompt.match(/^\s*(\d+)\s*([+\u00D7])\s*(\d+)\s*$/); if(!m) return null; const a=+m[1], b=+m[3]; const op=m[2]; const lo=Math.min(a,b), hi=Math.max(a,b); return `${op}:${lo},${hi}`; }
+
 // feed + stats
 function renderFeed(container,items){
   if(!container) return;
   if(!items||!items.length){ container.innerHTML='<div class="news-empty">No drills yet — hit Start.</div>'; return; }
   const fmt = iso => new Date(iso).toLocaleString(undefined,{weekday:"long",hour:"2-digit",minute:"2-digit"});
   container.innerHTML = items.map(d=>{
-    const mins=Math.floor(d.elapsed_ms/60000), secs=Math.floor((d.elapsed_ms/1000)%60);
-    return `<div class="news-item"><div class="news-time">${fmt(d.ts)}</div><div class="news-settings">${d.settings}</div><div class="news-result">${mins} min ${secs} secs</div></div>`;
+    const mins=Math.floor(d.time_ms/60000), secs=Math.floor((d.time_ms/1000)%60);
+    const star = d.star ? ' <span title="Star earned">⭐</span>' : '';
+    const typeLabel = d.drill_type[0].toUpperCase()+d.drill_type.slice(1);
+    const lvl = d.level? `Level ${d.level}` : '';
+    const score = d.score ? d.score : '';
+    return `<div class="news-item">
+      <div class="news-time">${fmt(d.ts)}${star}</div>
+      <div class="news-settings"><strong>${typeLabel}</strong>${lvl? ' — '+lvl:''}</div>
+      <div class="news-note">${d.label}</div>
+      <div class="news-score">Score ${score}</div>
+      <div class="news-result">${mins} min ${secs} secs</div>
+    </div>`;
   }).join("");
 }
 function renderStats(listEl,s){
@@ -55,10 +70,9 @@ function renderProgressOnCards(p){
   .forEach(([k,cardId,levelId,starsId,badgeId])=>{
     const card=document.getElementById(cardId), lvlEl=document.getElementById(levelId), stEl=document.getElementById(starsId), badge=document.getElementById(badgeId);
     const info=p[k]; if(!card||!lvlEl||!stEl||!info) return;
-    // show the true numeric level (sequential), not parsed from label text
     lvlEl.textContent = `Level ${info.level}`;
     stEl.textContent = starDots(info.last5);
-    if(badge) badge.textContent = info.ready_if_star? "One more star → level up" : "3 of last 5 stars → level up";
+    if(badge) badge.textContent = info.need_msg || (info.ready_if_star? "Need a star next round to level up" : "Get 3 of your last 5 stars to level up");
   });
 }
 function initHome(){
@@ -86,7 +100,7 @@ function initHome(){
   });
 }
 
-// heatmap
+// heatmap (brighter red = needs more work)
 function renderHeatmap(el,data,labelStart=1,labelEnd=12,withLegend=false){
   if(!el||!data||!data.grid) return;
   const g=data.grid, from=data.labels_from??labelStart, to=data.labels_to??labelEnd;
@@ -97,14 +111,14 @@ function renderHeatmap(el,data,labelStart=1,labelEnd=12,withLegend=false){
     for(let b=from;b<=to;b++){
       const v=(g[a]&&g[a][b]!==undefined)?g[a][b]:null;
       let bg="rgba(255,255,255,0.06)";
-      if(v!==null){ const clamped=Math.max(0,Math.min(1,v)); const alpha=0.08+clamped*0.75; bg=`rgba(255,80,80,${alpha})`; }
+      if(v!==null){ const clamped=Math.max(0,Math.min(1,v)); const alpha=0.05+clamped*0.9; bg=`rgba(255,60,60,${alpha})`; }
       html+=`<span class="hm-cell" title="${a},${b}" style="background:${bg}"></span>`;
     }
     html+=`</div>`;
   }
   html+=`</div>`;
   if(withLegend){
-    html+=`<div class="news-info" style="margin-top:6px;">Legend: darker squares need more work (last 5 attempts).</div>`;
+    html+=`<div class="news-info" style="margin-top:6px;">Legend: brighter red means that square needs more work (last 5 attempts).</div>`;
   }
   el.innerHTML=html;
 }
@@ -117,7 +131,8 @@ function insertWithin(arr,item,minAhead=3,maxAhead=5){ const pos=Math.min(arr.le
 function initDrill(){
   const drill=window.DRILL; if(!drill) return;
   const ansEl=document.getElementById("answer"), formEl=document.getElementById("answer-form"), qDoneEl=document.getElementById("q-done"), timerEl=document.getElementById("timer");
-  const finishActions=document.getElementById("finish-actions"), nextLvlForm=document.getElementById("nextlvl-form");
+  const finishActions=document.getElementById("finish-actions"), playAgainBtn=document.getElementById("play-again-btn"), nextLvlForm=document.getElementById("nextlvl-form"), homeBtn=document.getElementById("home-btn");
+  const helper=document.getElementById("helper");
   const overlay=document.getElementById("overlay"), overlayContent=document.getElementById("overlay-content");
 
   // hydrate sidebar on entry
@@ -135,8 +150,10 @@ function initDrill(){
   async function topUpQueue(){
     while(queue.length<6 && done+queue.length<drill.target){
       const avoid = queue.length? queue[queue.length-1].prompt : lastPrompt;
-      const nxt = await apiNext(drill.type, avoid);
-      if(avoid && nxt.prompt===avoid) continue;
+      const avoidPair = (queue.length? queue[queue.length-1].prompt : lastPrompt) ? commKey(queue.length? queue[queue.length-1].prompt : lastPrompt) : null;
+      const nxt = await apiNext(drill.type, avoid, avoidPair);
+      // additional guard for commutative dupes
+      if((avoid && nxt.prompt===avoid) || (avoidPair && commKey(nxt.prompt)===avoidPair)) continue;
       queue.push({prompt:nxt.prompt, answer:nxt.answer, tts:nxt.tts});
     }
   }
@@ -144,7 +161,7 @@ function initDrill(){
   async function finish(){
     running=false; winSound();
     const elapsed=Math.floor(performance.now()-start);
-    const correctFirstTry=drill.target - misses;
+    const correctFirstTry=drill.target - misses; // <-- accurate now
     const fd=new FormData();
     fd.set("drill_type",drill.type);
     fd.set("elapsed_ms", String(elapsed));
@@ -161,18 +178,29 @@ function initDrill(){
     apiStats().then(s=>renderStats(document.getElementById("stats-list"),s));
     apiFeed().then(f=>renderFeed(document.getElementById("feed-list"), f.items));
 
-    // Determine star robustly
     const gotStar = !!(pay && (pay.star || (Array.isArray(pay.awards) && pay.awards.join(" ").toLowerCase().includes("star"))));
-    const helper=document.getElementById("helper");
-    if(helper){
-      if(gotStar){
-        helper.textContent = `⭐ Star earned — Time ${fmtTime(elapsed)} • Score ${correctFirstTry}/20 • Get 3 of your last 5 stars to level up.`;
-      }else{
-        const msg = pay && pay.fail_msg ? pay.fail_msg : "No star this time — keep going!";
-        helper.textContent = `No star this time — ${msg} • Time ${fmtTime(elapsed)} • Score ${correctFirstTry}/20.`;
+    if(gotStar) starSound();
+
+    if(pay && pay.level_up){
+      // Big celebration + only show “Start next level”
+      if(helper) helper.textContent = `⬆️ Level up! Next: ${pay.new_level_label}`;
+      levelUpSound();
+      if(playAgainBtn) playAgainBtn.classList.add("hidden");
+      if(homeBtn) homeBtn.classList.add("hidden");
+      if(nextLvlForm) nextLvlForm.classList.remove("hidden");
+    }else{
+      if(helper){
+        if(gotStar){
+          helper.textContent = `⭐ Star earned — Time ${fmtTime(elapsed)} • Score ${correctFirstTry}/20 • ${pay?.need_hint || "Get 3 of your last 5 stars to level up."}`;
+        }else{
+          const msg = pay && pay.fail_msg ? pay.fail_msg : "No star this time — keep going!";
+          helper.textContent = `No star this time — ${msg} • Time ${fmtTime(elapsed)} • Score ${correctFirstTry}/20.`;
+        }
       }
+      if(nextLvlForm) nextLvlForm.classList.add("hidden");
+      if(playAgainBtn) playAgainBtn.classList.remove("hidden");
+      if(homeBtn) homeBtn.classList.remove("hidden");
     }
-    if(pay && pay.level_up && nextLvlForm) nextLvlForm.classList.remove("hidden");
   }
 
   formEl.addEventListener("submit", async (e)=>{
@@ -186,11 +214,13 @@ function initDrill(){
     if(val===current.answer){
       ding();
       qlog.push({prompt:current.prompt, a:+parsed.a, b:+parsed.b, correct_answer:current.answer, given_answer:val, correct:true, started_at:currentStart.toISOString(), elapsed_ms:elapsed});
-      done+=1; if(qDoneEl) qDoneEl.textContent=String(done);
+      done+=1; document.getElementById("q-done").textContent=String(done);
       lastPrompt=current.prompt;
       if(done>=drill.target){ await finish(); return; }
       await topUpQueue(); showCurrent();
     }else{
+      // track miss count for true first-try score
+      misses += 1;
       say(current.tts);
       qlog.push({prompt:current.prompt, a:+parsed.a, b:+parsed.b, correct_answer:current.answer, given_answer:val, correct:false, started_at:currentStart.toISOString(), elapsed_ms:elapsed});
       overlayContent.innerHTML = `${digitsToHTML(parsed.a)} <span class="op">${parsed.op}</span> ${digitsToHTML(parsed.b)} = ${digitsToHTML(String(current.answer))}`;

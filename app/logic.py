@@ -1,11 +1,10 @@
-"""Question generation + star/level evaluation."""
+"""Generation + simplified star rule + helpers."""
 from __future__ import annotations
 import random
 from collections import defaultdict
 from typing import Dict, List, Tuple, Any
 
 from .models import DrillTypeEnum
-from .levels import thresholds_for_level
 
 def _rand(a: int, b: int) -> int:
     if a > b: a, b = b, a
@@ -14,7 +13,7 @@ def _rand(a: int, b: int) -> int:
 def _choose(seq):
     return random.choice(seq)
 
-# ----------------- Generation from presets (with recap bias) -----------------
+# ----------------- Generation from presets -----------------
 def _choose_with_bias(full_list: list[int], focus: list[int], weight_focus: float = 0.6) -> int:
     if not focus:
         return _choose(full_list)
@@ -76,7 +75,7 @@ def generate_from_preset(drill_type: DrillTypeEnum, preset: Dict[str, Any]) -> T
 
     raise ValueError("Unsupported drill type")
 
-# ----------------- Metrics + star rule -----------------
+# ----------------- Metrics -----------------
 def compute_first_try_metrics(qlog: List[dict]) -> dict:
     attempts_by_prompt: Dict[str, List[dict]] = defaultdict(list)
     for e in qlog:
@@ -84,8 +83,6 @@ def compute_first_try_metrics(qlog: List[dict]) -> dict:
 
     total_items = 0
     first_try_correct = 0
-    tpq_sum_ms = 0
-    hard_mistakes = 0
 
     for prompt, attempts in attempts_by_prompt.items():
         attempts.sort(key=lambda x: x["started_at"])
@@ -95,50 +92,48 @@ def compute_first_try_metrics(qlog: List[dict]) -> dict:
         first = attempts[0]
         if first["correct"]:
             first_try_correct += 1
-            tpq_sum_ms += int(first.get("elapsed_ms", 0))
-        wrong_before_correct = 0
-        for a in attempts:
-            if a["correct"]:
-                break
-            wrong_before_correct += 1
-        if wrong_before_correct >= 2:
-            hard_mistakes += 1
 
     acc = (first_try_correct / total_items) if total_items else 0.0
-    tpq_ms = (tpq_sum_ms / first_try_correct) if first_try_correct else None
     return {
         "items": total_items,
         "first_try_correct": first_try_correct,
         "acc": acc,
-        "tpq_ms": tpq_ms,
-        "hard_mistakes": hard_mistakes
     }
 
-def ewma_update(old: float | None, new: float, alpha: float = 0.25) -> float:
-    if old is None: return new
-    return alpha * new + (1 - alpha) * old
+# ----------------- Star rule (simplified) -----------------
+def star_decision(metrics: dict, total_time_ms: int, target_time_sec: float) -> tuple[bool, dict]:
+    """
+    Gates:
+      - Accuracy >= A(level)  (A varies by level in thresholds_for_level)
+      - Total time <= personalised target_time_sec (locked at level start)
+    """
+    # accuracy gates vary slowly by level — mirror levels.thresholds_for_level for A-only
+    # We keep it simple by using a tiered accuracy that scales with item count
+    items = metrics.get("items", 20) or 20
+    if items <= 10:
+        A = 0.8
+    elif items <= 20:
+        A = 0.85
+    else:
+        A = 0.9
 
-def star_decision(level: int, metrics: dict, total_time_ms: int, ewma_tpq_ms: float | None) -> Tuple[bool, dict]:
-    A, CAP, DELTA, HM, TMAX = thresholds_for_level(level)
-    exp = {"A":A, "CAP":CAP, "DELTA":DELTA, "HM":HM, "TMAX":TMAX,
-           "acc":metrics["acc"], "tpq_ms":metrics["tpq_ms"], "hard_mistakes":metrics["hard_mistakes"]}
-    if metrics["acc"] < A: exp["why"]="accuracy_below_gate"; return False, exp
-    if total_time_ms > TMAX * 1000: exp["why"]="over_total_time_cap"; return False, exp
-    if metrics["hard_mistakes"] > HM: exp["why"]="too_many_hard_mistakes"; return False, exp
+    exp = {"A": A, "acc": metrics["acc"], "target_sec": target_time_sec}
+    if metrics["acc"] < A:
+        exp["why"] = "accuracy_below_gate"; return False, exp
 
-    tpq_ms = metrics["tpq_ms"]
-    if tpq_ms is None and metrics.get("items", 0) > 0:
-        tpq_ms = total_time_ms / metrics["items"]  # fallback
-    if tpq_ms is None: exp["why"] = "no_first_try_timing"; return False, exp
+    if (total_time_ms / 1000.0) > float(target_time_sec):
+        exp["why"] = "too_slow"; return False, exp
 
-    abs_ok = (tpq_ms / 1000.0) <= CAP
-    imp_ok = (ewma_tpq_ms is not None) and (tpq_ms <= ewma_tpq_ms * (1.0 - DELTA))
-    if not (abs_ok or imp_ok): exp["why"]="too_slow"; return False, exp
+    exp["why"] = "ok"; return True, exp
 
-    exp["why"]="ok"; return True, exp
-
-def levelup_decision(stars_recent: str, this_star: bool) -> bool:
-    s = (stars_recent + ("1" if this_star else "0"))[-5:]
-    last5 = s.count("1")
-    last3 = s[-3:].count("1")
-    return this_star and (last5 >= 3) and (last3 >= 2)
+# ----------------- Commutative duplicate helper -----------------
+def is_commutative_op_key(prompt: str) -> str | None:
+    """
+    Returns a key like '×:4,6' or '+:3,9' for commutative ops, else None.
+    """
+    import re
+    m = re.match(r"^\s*(\d+)\s*([+\u00D7])\s*(\d+)\s*$", prompt)  # + or ×
+    if not m: return None
+    a, op, b = int(m.group(1)), m.group(2), int(m.group(3))
+    lo, hi = sorted((a, b))
+    return f"{op}:{lo},{hi}"

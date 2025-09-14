@@ -1,38 +1,55 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="drill-layout">
+<div class="layout">
   <section class="main-col">
-    <div class="statusbar">
-      <div>Type: <strong>{{ drill_type }}</strong></div>
-      <div>Level: <strong id="settings-human">{{ settings_human }}</strong></div>
-      <div>Q:<strong><span id="q-done">0</span>/<span id="q-total">{{ target_count }}</span></strong></div>
-      <div class="timer" id="timer">0:00</div>
+    <div class="row space-between">
+      <h1 class="title">Drill</h1>
+      <a class="muted-link" href="/home">← Home</a>
     </div>
 
-    <!-- Vertical equation -->
-    <div class="equation" id="equation">
-      <div class="eq-row"><span class="num" id="num-a"></span></div>
-      <div class="eq-row"><span class="op" id="op"></span><span class="num" id="num-b"></span></div>
-      <div class="rule"></div>
-      <form id="answer-form" class="answer">
-        <input id="answer" inputmode="numeric" autocomplete="off" placeholder="Answer" required class="answer-input">
-        <button class="btn btn-primary" type="submit">Enter</button>
-      </form>
+    <div id="settings-human" class="note">{{ settings_human }}</div>
+
+    <div id="equation" class="equation">
+      <div class="eq-col">
+        <div id="num-a" class="eq-num">12</div>
+        <div class="eq-row">
+          <div id="op" class="eq-op">×</div>
+          <div id="num-b" class="eq-num">7</div>
+        </div>
+        <div class="eq-line"></div>
+        <form id="answer-form" class="answer-form">
+          <input id="answer" type="number" inputmode="numeric" autocomplete="off" placeholder="answer" class="answer-input">
+          <button type="submit" class="btn btn-primary enter-btn">Enter ⏎</button>
+        </form>
+      </div>
+      <div class="eq-meta">
+        <div class="timer" id="timer">0:00</div>
+        <div class="progress">Question <span id="q-done">0</span>/20</div>
+      </div>
     </div>
 
-    <div class="helper" id="helper"></div>
+    <div id="overlay" class="overlay hidden">
+      <div id="overlay-content" class="overlay-box">1 × 2 = 2</div>
+    </div>
+
+    <div id="helper" class="helper">Answer to begin…</div>
 
     <div id="finish-actions" class="finish-actions hidden">
-      <form id="again-form" method="post" action="/start" class="finish-form">
+      <button id="play-again-btn" class="btn">Play again</button>
+      <form id="nextlvl-form" class="hidden" method="post" action="/start">
         <input type="hidden" name="drill_type" value="{{ drill_type }}">
-        <button class="btn btn-primary btn-wide" type="submit">Play again</button>
+        <button class="btn btn-primary">Start next level</button>
       </form>
-      <form id="nextlvl-form" method="post" action="/start" class="finish-form hidden">
-        <input type="hidden" name="drill_type" value="{{ drill_type }}">
-        <button class="btn btn-secondary btn-wide" type="submit">Start next level</button>
-      </form>
-      <a class="btn btn-secondary btn-wide" href="/home">Home</a>
+      <a id="home-btn" class="btn btn-secondary" href="/home">Home</a>
     </div>
+
+    <script>
+      window.DRILL = {
+        type: "{{ drill_type }}",
+        target: {{ target_count }},
+        first: {prompt: "{{ first_prompt }}", answer: {{ first_answer }}, tts: "{{ first_tts }}"}
+      };
+    </script>
   </section>
 
   <aside class="news-col">
@@ -44,18 +61,9 @@
       <li>Multiplication: <strong>0</strong></li>
       <li>Division: <strong>0</strong></li>
     </ul>
-    <div class="news-head">Feed</div>
-    <div id="feed-list"><div class="news-info">We’ll add your result here when you finish.</div></div>
+
+    <div class="news-head">Your newsfeed</div>
+    <div id="feed-list" class="news-list"></div>
   </aside>
 </div>
-
-<script>
-window.DRILL = {
-  type: "{{ drill_type }}",
-  target: {{ target_count }},
-  first: { prompt: "{{ first_prompt }}", answer: {{ first_answer }}, tts: "{{ first_tts }}" }
-};
-</script>
-
-<div id="overlay" class="overlay hidden"><div class="overlay-content" id="overlay-content"></div></div>
 {% endblock %}
