@@ -61,7 +61,6 @@ def ensure_progress_rows(uid: int):
                 UserProgress.user_id == uid, UserProgress.drill_type == dt
             )).first()
             if not prog:
-                # per-level personalised speed target = TMAX(level)
                 _, _, _, _, TMAX = thresholds_for_level(1)
                 s.add(UserProgress(user_id=uid, drill_type=dt, level=1, target_time_sec=TMAX))
         s.commit()
@@ -97,7 +96,6 @@ def user_add(display_name: str = Form(...)):
         u = User(display_name=name)
         s.add(u); s.commit(); s.refresh(u)
         s.add(UserSettings(user_id=u.id))
-        # initialise progress rows
         for dt in DrillTypeEnum:
             _, _, _, _, TMAX = thresholds_for_level(1)
             s.add(UserProgress(user_id=u.id, drill_type=dt, level=1, target_time_sec=TMAX))
@@ -158,7 +156,10 @@ def next_problem(
 
 def _friendly_fail(metrics: dict, target_time_sec: float, why: str) -> str:
     items = metrics.get("items", 20) or 20
-    A, _, _, _, _ = thresholds_for_level(1)  # A only (varies slightly by level—fine for messaging)
+    # Tiered accuracy target matches star rule
+    if items <= 10: A = 0.8
+    elif items <= 20: A = 0.85
+    else: A = 0.9
     need = int((A * items + 0.9999))  # ceil
     ftc = metrics.get("first_try_correct", round(metrics.get("acc", 0.0) * items))
 
@@ -194,7 +195,6 @@ def finish_drill(
             prog = UserProgress(user_id=uid, drill_type=drill_type, level=1, target_time_sec=TMAX)
             s.add(prog); s.commit(); s.refresh(prog)
 
-        # record result (prefix label with [L#] so feed can show it)
         level_at = int(prog.level)
         snapshot = f"[L{level_at}] {settings_human} • Score {score}/{question_count}"
         rec = DrillResult(
@@ -203,7 +203,6 @@ def finish_drill(
         )
         s.add(rec); s.commit(); s.refresh(rec)
 
-        # store questions
         try:
             logs = json.loads(qlog)
         except Exception:
@@ -222,28 +221,29 @@ def finish_drill(
             s.add(dq)
         s.commit()
 
-        # metrics + star
         metrics = compute_first_try_metrics(logs)
-        target_time_sec = float(prog.target_time_sec or thresholds_for_level(prog.level)[4])
-        star, exp = star_decision(metrics, elapsed_ms, target_time_sec)
+
+        # tolerate older DBs missing the column (but recommend dropping the DB)
+        tts = getattr(prog, "target_time_sec", None)
+        if not tts:
+            _, _, _, _, TMAX = thresholds_for_level(prog.level)
+            tts = TMAX
+
+        star, exp = star_decision(metrics, elapsed_ms, float(tts))
 
         awards: list[tuple[str,str]] = []
         if star: awards.append(("star", "⭐ Star earned"))
 
-        # personal bests (per level)
         if prog.best_time_ms is None or elapsed_ms < prog.best_time_ms:
             prog.best_time_ms = elapsed_ms; awards.append(("pb_time", "🏁 New best time"))
         if prog.best_acc is None or metrics["acc"] > (prog.best_acc or 0):
             prog.best_acc = metrics["acc"]; awards.append(("pb_acc", "🎯 New best accuracy"))
 
-        # stars history + level up calc (before appending this one)
         sr_before = prog.stars_recent or ""
         did_level_up = levelup_decision(sr_before, star)
 
-        # append this drill
         prog.stars_recent = (sr_before + ("1" if star else "0"))[-6:]
 
-        # level up → compute next level's personalised target, then reset per-level stats
         new_level_label = ""
         if did_level_up:
             prev_best_sec = (prog.best_time_ms or elapsed_ms) / 1000.0
@@ -252,19 +252,21 @@ def finish_drill(
             next_target = min(TMAX, prev_best_sec * 1.5)
             prog.level = next_level
             prog.last_levelup_at = datetime.utcnow()
-            prog.target_time_sec = int(round(next_target))
+            # only set if the column exists (old DBs will still run; recommended to drop DB)
+            try:
+                prog.target_time_sec = int(round(next_target))
+            except Exception:
+                pass
             new_level_label = level_label(drill_type, next_level)
-            # reset per-level stats for the new level
             prog.best_time_ms = None
             prog.best_acc = None
             prog.stars_recent = ""
             awards.append(("level_up", f"⬆️ Level up to {new_level_label}"))
 
-        # resolve values before commit/session closes
         new_level_val = int(prog.level)
         star_bool = bool(star)
         levelup_bool = bool(did_level_up)
-        fail_msg = "" if star_bool else _friendly_fail(metrics, target_time_sec, exp.get("why",""))
+        fail_msg = "" if star_bool else _friendly_fail(metrics, float(tts), exp.get("why",""))
 
         s.add(prog); s.commit()
 
@@ -280,30 +282,55 @@ def finish_drill(
         "new_level_label": new_level_label,
         "awards": [a for _, a in awards],
         "fail_msg": fail_msg,
-        "need_hint": need_hint_text(sr_before, star),  # before-append view for “what do I need now?”
+        "need_hint": need_hint_text(sr_before, star),
     })
 
 # ---------- Stars-needed messaging ----------
-def need_hint_text(stars_recent: str, this_star: bool) -> str:
+def _oldest_star_life_rounds(stars_recent: str) -> int:
     """
-    Return a short hint like:
-    - "Need a star next round to level up" OR
-    - "Need 2 of the next 4 rounds to level up"
-    Looks ahead up to 4 rounds, considering the rolling 5-window + last-3 rule.
+    How many future rounds until the OLDEST existing star drops off the 5-drill window?
+    If there are no stars, return 0.
     """
     s = (stars_recent or "")[-5:]
-    # If a star now would level up immediately:
+    if "1" not in s:
+        return 0
+    L = len(s)
+    idx = s.find("1")  # 0-based from left (oldest)
+    # life = rounds until drop:
+    # - while L<5, we can append (5-L) without dropping anything
+    # - once full, an item at index idx drops after (idx+1) more appends
+    return (5 - L) + (idx + 1)
+
+def need_hint_text(stars_recent: str, this_star: bool) -> str:
+    """
+    Friendly, simple hints:
+      - 0 stars: "Need 3 stars in the next 5 rounds to level up"
+      - 1 star (not dropping in next 2): "Need 2 stars in the next N rounds…"
+      - 2 stars (oldest not dropping next round): "Need 1 star in the next N rounds…"
+      - If a single star next round would level up: "Need a star next round to level up"
+      - Else: best effort over 2–5 using enumeration
+    """
+    s = (stars_recent or "")[-5:]
+    # if a star next round would level up immediately:
     if levelup_decision(s, True):
         return "Need a star next round to level up"
-    # brute-force minimal stars over horizon 2..4
-    for horizon in range(2, 5):
+
+    c = s.count("1")
+    if c == 0:
+        return "Need 3 stars in the next 5 rounds to level up"
+
+    life = _oldest_star_life_rounds(s)  # rounds until oldest star falls out
+    if c == 1 and life >= 3:
+        return f"Need 2 stars in the next {life} rounds to level up"
+    if c == 2 and life >= 2:
+        return f"Need 1 star in the next {life} rounds to level up"
+
+    # fallback: brute-force minimal solution within next 2..5 rounds
+    from itertools import product
+    for horizon in range(2, 6):
         best_needed = 10
-        # enumerate all patterns of S/N over horizon with k stars
-        from itertools import product
         for seq in product([0,1], repeat=horizon):
-            # count stars
             k = sum(seq)
-            # simulate rolling window
             win = s
             ok = False
             for b in seq:
@@ -313,8 +340,6 @@ def need_hint_text(stars_recent: str, this_star: bool) -> str:
             if ok:
                 best_needed = min(best_needed, k)
         if best_needed < 10:
-            if horizon == 1:
-                return "Need a star next round to level up"
             if best_needed == 1 and horizon == 2:
                 return "Need 1 of the next 2 rounds to level up"
             return f"Need {best_needed} of the next {horizon} rounds to level up"
@@ -358,7 +383,6 @@ def feed(request: Request):
             .limit(25)
         ).all()
 
-        # map: result_id -> has_star
         res_ids = [r.id for r in results]
         star_ids: Set[int] = set()
         if res_ids:
@@ -371,15 +395,15 @@ def feed(request: Request):
 
     items = []
     for r in results:
-        # parse [L#] out of snapshot if present
         m = re.match(r"^\[L(\d+)\]\s+(.*)$", r.settings_snapshot or "")
         level_num = int(m.group(1)) if m else None
         label_part = m.group(2) if m else (r.settings_snapshot or "")
-        # extract score from "• Score a/b" if present
+        # separate the score (strip it from the label line)
         score_num = None
-        ms = re.search(r"Score\s+(\d+)\s*/\s*(\d+)", r.settings_snapshot or "")
+        ms = re.search(r"Score\s+(\d+)\s*/\s*(\d+)", label_part)
         if ms:
             score_num = f"{ms.group(1)}/{ms.group(2)}"
+            label_part = re.sub(r"\s*•\s*Score\s+\d+\s*/\s*\d+\s*", " ", label_part).strip()
         items.append({
             "ts": r.created_at.isoformat(),
             "drill_type": r.drill_type.value,
@@ -442,6 +466,7 @@ def report_mul(request: Request):
             select(DrillQuestion.a, DrillQuestion.b, DrillQuestion.correct, DrillQuestion.started_at, DrillResult.user_id)
             .join(DrillResult, DrillResult.id == DrillQuestion.drill_result_id)
             .where(DrillResult.user_id == uid)
+            .where(DrillQuestion.drill_type == DrillTypeEnum.multiplication)
         ).all()
     for a, b, ok, ts, _uid in q:
         rows.append((int(a), int(b), bool(ok), ts))
@@ -459,6 +484,7 @@ def report_add(request: Request):
             select(DrillQuestion.a, DrillQuestion.b, DrillQuestion.correct, DrillQuestion.started_at, DrillResult.user_id)
             .join(DrillResult, DrillResult.id == DrillQuestion.drill_result_id)
             .where(DrillResult.user_id == uid)
+            .where(DrillQuestion.drill_type == DrillTypeEnum.addition)
         ).all()
     for a, b, ok, ts, _uid in q:
         rows.append((int(a), int(b), bool(ok), ts))
@@ -476,6 +502,7 @@ def report_sub(request: Request):
             select(DrillQuestion.a, DrillQuestion.b, DrillQuestion.correct, DrillQuestion.started_at, DrillResult.user_id)
             .join(DrillResult, DrillResult.id == DrillQuestion.drill_result_id)
             .where(DrillResult.user_id == uid)
+            .where(DrillQuestion.drill_type == DrillTypeEnum.subtraction)
         ).all()
     for a, b, ok, ts, _uid in q:
         rows.append((int(a), int(b), bool(ok), ts))
@@ -505,7 +532,8 @@ def admin_login(request: Request, password: str = Form(...)):
     if not cfg or password != cfg.admin_password_plain:
         return RedirectResponse("/admin", status_code=303)
     resp = RedirectResponse("/admin", status_code=303)
-    resp.set_cookie("is_admin", "1", max_age=60*60*6, samesite="lax")
+    # shorter-lived & HttpOnly so it can’t be set from client JS
+    resp.set_cookie("is_admin", "1", max_age=60*60*6, samesite="lax", httponly=True)
     return resp
 
 @app.post("/admin/delete_user")

@@ -119,3 +119,25 @@ input[type="number"], input[type="text"], input[type="password"], input[type="ch
 .hm-head { background:#162048; color:#c9cfe8; font-size:12px; text-align:center; }
 .hm-headcell { background:#162048; color:#c9cfe8; font-size:12px; text-align:center; }
 .hm-cell { width:24px; height:24px; display:inline-block; }
+/* --- Answer field: no spinners, nice big font --- */
+input[type=number]::-webkit-outer-spin-button,
+input[type=number]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type=number] { -moz-appearance: textfield; }
+
+.answer-input {
+  font-size: 3rem;
+  line-height: 1.1;
+  color: var(--fg);
+}
+
+.eq-num {
+  font-size: 4rem;
+  line-height: 1;
+  color: var(--fg);
+}
+
+/* Keep enter aligned off to the right a touch */
+.answer-form .enter-btn { margin-left: 12px; }
