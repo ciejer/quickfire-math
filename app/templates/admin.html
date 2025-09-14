@@ -8,32 +8,33 @@
     </div>
 
     {% if not authed %}
-      <form method="post" action="/admin/login" class="chooser">
-        <label>Enter admin password</label>
-        <input type="password" name="password" placeholder="password" required>
+      <form method="post" action="/admin/login" class="card">
+        <div class="row">
+          <input type="password" name="password" placeholder="Admin password">
+          <button class="btn btn-primary">Log in</button>
+        </div>
         <div class="note">{{ hint }}</div>
-        <div style="margin-top:10px;"><button class="btn btn-primary">Sign in</button></div>
       </form>
     {% else %}
-      <h3>Players</h3>
-      <div class="op-cards">
-        {% for u in users %}
-        <div class="op-card">
-          <div class="op-title">{{ u.display_name }}</div>
-          <form method="post" action="/admin/delete_user" onsubmit="return confirm('Delete {{u.display_name}} and all their data?')">
-            <input type="hidden" name="user_id" value="{{u.id}}">
-            <button class="btn btn-danger">Delete</button>
-          </form>
-        </div>
-        {% endfor %}
+      <form method="post" action="/admin/logout" class="card" style="margin-bottom:12px;">
+        <button class="btn btn-secondary">Log out</button>
+      </form>
+
+      <div class="card">
+        <h3>Players</h3>
+        <ul class="list">
+          {% for u in users %}
+            <li class="row space-between">
+              <span>{{ u.display_name }}</span>
+              <form method="post" action="/admin/delete_user" onsubmit="return confirm('Delete {{ u.display_name }}? This cannot be undone.');">
+                <input type="hidden" name="user_id" value="{{ u.id }}">
+                <button class="btn btn-danger">Delete</button>
+              </form>
+            </li>
+          {% endfor %}
+        </ul>
       </div>
-      <div class="news-info">To change the admin password, restart the container; a new password will be printed to logs.</div>
     {% endif %}
   </section>
-
-  <aside class="news-col">
-    <div class="news-head">Tip</div>
-    <div class="news-info">Only admins can delete players. The password is printed to logs on boot.</div>
-  </aside>
 </div>
 {% endblock %}

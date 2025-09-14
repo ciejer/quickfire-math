@@ -35,7 +35,10 @@
     <div id="helper" class="helper">Answer to begin…</div>
 
     <div id="finish-actions" class="finish-actions hidden">
-      <button id="play-again-btn" class="btn">Play again</button>
+      <form id="again-form" method="post" action="/start">
+        <input type="hidden" name="drill_type" value="{{ drill_type }}">
+        <button id="play-again-btn" class="btn">Play again</button>
+      </form>
       <form id="nextlvl-form" class="hidden" method="post" action="/start">
         <input type="hidden" name="drill_type" value="{{ drill_type }}">
         <button class="btn btn-primary">Start next level</button>

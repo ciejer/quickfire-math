@@ -6,12 +6,12 @@ const audioCtx = typeof window!=="undefined" && "AudioContext" in window ? new A
 let mediaUnlocked=false;
 function unlockMediaOnce(){ if(mediaUnlocked) return; try{ if(audioCtx&&audioCtx.state==="suspended") audioCtx.resume(); }catch{} try{ if("speechSynthesis" in window){ speechSynthesis.getVoices(); speechSynthesis.onvoiceschanged=()=>{}; } }catch{} mediaUnlocked=true; }
 ["touchstart","pointerdown","mousedown","keydown","click"].forEach(e=>window.addEventListener(e,unlockMediaOnce,{once:true,passive:true}));
-function tone(freq,dur=0.12,gain=0.04,when=0){ if(!audioCtx) return; const o=audioCtx.createOscillator(), g=audioCtx.createGain(); o.type="sine"; o.frequency.value=freq; g.gain.value=gain; o.connect(g); g.connect(audioCtx.destination); o.start(audioCtx.currentTime+when); o.stop(audioCtx.currentTime+when+dur); }
+function tone(f,d=0.12,g=0.04,w=0){ if(!audioCtx) return; const o=audioCtx.createOscillator(), a=audioCtx.createGain(); o.type="sine"; o.frequency.value=f; a.gain.value=g; o.connect(a); a.connect(audioCtx.destination); o.start(audioCtx.currentTime+w); o.stop(audioCtx.currentTime+w+d); }
 function ding(){ tone(880,0.08,0.06); }
 function winSound(){ [523.25,659.25,783.99].forEach((f,i)=>tone(f,0.15,0.05,i*0.1)); }
-function starSound(){ [659.25,783.99,987.77,1318.51].forEach((f,i)=>tone(f,0.12,0.06,i*0.08)); } // 🎉
-function levelUpSound(){ [392,523.25,659.25,783.99,1046.5].forEach((f,i)=>tone(f,0.18,0.06,i*0.12)); } // bigger 🎉
-function say(text){ if(!window.speechSynthesis) return; try{ const u=new SpeechSynthesisUtterance(text); u.rate=1.05; u.pitch=1.0; const enNZ=speechSynthesis.getVoices().find(v=>/en[-_]NZ/i.test(v.lang)); if(enNZ) u.voice=enNZ; speechSynthesis.cancel(); speechSynthesis.speak(u);}catch{} }
+function starSound(){ [659.25,783.99,987.77,1318.51].forEach((f,i)=>tone(f,0.12,0.06,i*0.08)); }
+function levelUpSound(){ [392,523.25,659.25,783.99,1046.5].forEach((f,i)=>tone(f,0.18,0.06,i*0.12)); }
+function say(text){ if(!window.speechSynthesis) return; try{ const u=new SpeechSynthesisUtterance(text); u.rate=1.05; const enNZ=speechSynthesis.getVoices().find(v=>/en[-_]NZ/i.test(v.lang)); if(enNZ) u.voice=enNZ; speechSynthesis.cancel(); speechSynthesis.speak(u);}catch{} }
 
 // digit colouring — ONLY operands & wrong-answer overlay
 function digitsToHTML(str){ return String(str).replace(/\d/g,d=>`<span class="digit d${d}">${d}</span>`); }
@@ -38,11 +38,11 @@ function renderFeed(container,items){
     const mins=Math.floor(d.time_ms/60000), secs=Math.floor((d.time_ms/1000)%60);
     const star = d.star ? ' <span title="Star earned">⭐</span>' : '';
     const typeLabel = d.drill_type[0].toUpperCase()+d.drill_type.slice(1);
-    const lvl = d.level? `Level ${d.level}` : '';
+    const lvl = d.level? ` — Level ${d.level}` : '';
     const score = d.score ? d.score : '';
     return `<div class="news-item">
       <div class="news-time">${fmt(d.ts)}${star}</div>
-      <div class="news-settings"><strong>${typeLabel}</strong>${lvl? ' — '+lvl:''}</div>
+      <div class="news-settings"><strong>${typeLabel}</strong>${lvl}</div>
       <div class="news-note">${d.label}</div>
       <div class="news-score">Score ${score}</div>
       <div class="news-result">${mins} min ${secs} secs</div>
@@ -72,7 +72,7 @@ function renderProgressOnCards(p){
     const info=p[k]; if(!card||!lvlEl||!stEl||!info) return;
     lvlEl.textContent = `Level ${info.level}`;
     stEl.textContent = starDots(info.last5);
-    if(badge) badge.textContent = info.need_msg || (info.ready_if_star? "Need a star next round to level up" : "Get 3 of your last 5 stars to level up");
+    if(badge) badge.textContent = info.need_msg || "Get 3 of your last 5 stars to level up";
   });
 }
 function initHome(){
@@ -131,7 +131,7 @@ function insertWithin(arr,item,minAhead=3,maxAhead=5){ const pos=Math.min(arr.le
 function initDrill(){
   const drill=window.DRILL; if(!drill) return;
   const ansEl=document.getElementById("answer"), formEl=document.getElementById("answer-form"), qDoneEl=document.getElementById("q-done"), timerEl=document.getElementById("timer");
-  const finishActions=document.getElementById("finish-actions"), playAgainBtn=document.getElementById("play-again-btn"), nextLvlForm=document.getElementById("nextlvl-form"), homeBtn=document.getElementById("home-btn");
+  const finishActions=document.getElementById("finish-actions"), playAgainBtn=document.getElementById("play-again-btn"), againForm=document.getElementById("again-form"), nextLvlForm=document.getElementById("nextlvl-form"), homeBtn=document.getElementById("home-btn");
   const helper=document.getElementById("helper");
   const overlay=document.getElementById("overlay"), overlayContent=document.getElementById("overlay-content");
 
@@ -152,7 +152,6 @@ function initDrill(){
       const avoid = queue.length? queue[queue.length-1].prompt : lastPrompt;
       const avoidPair = (queue.length? queue[queue.length-1].prompt : lastPrompt) ? commKey(queue.length? queue[queue.length-1].prompt : lastPrompt) : null;
       const nxt = await apiNext(drill.type, avoid, avoidPair);
-      // additional guard for commutative dupes
       if((avoid && nxt.prompt===avoid) || (avoidPair && commKey(nxt.prompt)===avoidPair)) continue;
       queue.push({prompt:nxt.prompt, answer:nxt.answer, tts:nxt.tts});
     }
@@ -161,7 +160,7 @@ function initDrill(){
   async function finish(){
     running=false; winSound();
     const elapsed=Math.floor(performance.now()-start);
-    const correctFirstTry=drill.target - misses; // <-- accurate now
+    const correctFirstTry=drill.target - misses;
     const fd=new FormData();
     fd.set("drill_type",drill.type);
     fd.set("elapsed_ms", String(elapsed));
@@ -175,6 +174,7 @@ function initDrill(){
     document.getElementById("equation").classList.add("finished");
     formEl.classList.add("hidden"); finishActions.classList.remove("hidden");
 
+    // refresh sidebar
     apiStats().then(s=>renderStats(document.getElementById("stats-list"),s));
     apiFeed().then(f=>renderFeed(document.getElementById("feed-list"), f.items));
 
@@ -182,12 +182,11 @@ function initDrill(){
     if(gotStar) starSound();
 
     if(pay && pay.level_up){
-      // Big celebration + only show “Start next level”
       if(helper) helper.textContent = `⬆️ Level up! Next: ${pay.new_level_label}`;
       levelUpSound();
-      if(playAgainBtn) playAgainBtn.classList.add("hidden");
-      if(homeBtn) homeBtn.classList.add("hidden");
       if(nextLvlForm) nextLvlForm.classList.remove("hidden");
+      if(playAgainBtn) playAgainBtn.classList.add("hidden");  // no replay on exact level-up
+      if(homeBtn) homeBtn.classList.remove("hidden");         // keep Home visible on level-up
     }else{
       if(helper){
         if(gotStar){
@@ -220,17 +219,26 @@ function initDrill(){
       await topUpQueue(); showCurrent();
     }else{
       // track miss count for true first-try score
-      misses += 1;
       say(current.tts);
+      const avoidPairPrev = queue.length? commKey(queue[queue.length-1].prompt) : commKey(lastPrompt || "");
       qlog.push({prompt:current.prompt, a:+parsed.a, b:+parsed.b, correct_answer:current.answer, given_answer:val, correct:false, started_at:currentStart.toISOString(), elapsed_ms:elapsed});
-      overlayContent.innerHTML = `${digitsToHTML(parsed.a)} <span class="op">${parsed.op}</span> ${digitsToHTML(parsed.b)} = ${digitsToHTML(String(current.answer))}`;
+      // overlay with BIG coloured digits
+      const html = `${digitsToHTML(parsed.a)} <span class="op">${parsed.op}</span> ${digitsToHTML(parsed.b)} = ${digitsToHTML(String(current.answer))}`;
+      const overlay=document.getElementById("overlay"), overlayContent=document.getElementById("overlay-content");
+      overlayContent.innerHTML = html;
       overlay.classList.remove("hidden");
+      // queue re-ask 3–5 later
       insertWithin(queue, current, 3, 5);
       await topUpQueue();
       formEl.classList.add("disabled");
-      setTimeout(()=>{ overlay.classList.add("hidden"); formEl.classList.remove("disabled"); showCurrent(); }, 3000);
+      setTimeout(()=>{ overlay.classList.add("hidden"); formEl.classList.remove("disabled"); ansEl.value=""; ansEl.focus(); }, 3000);
     }
   });
+
+  // Play again posts back to /start with same drill type
+  if(playAgainBtn && againForm){
+    playAgainBtn.addEventListener("click", (e)=>{ e.preventDefault(); againForm.submit(); });
+  }
 
   renderEq(queue[0].prompt);
   topUpQueue(); ansEl.focus();

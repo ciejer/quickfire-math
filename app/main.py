@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os, secrets, random, json, re
 from datetime import datetime, timedelta
-from typing import Optional, Dict, List, Tuple, Set
+from typing import Optional, Dict, List, Tuple, Set, Any
 
 from fastapi import FastAPI, Request, Form, HTTPException
 from fastapi.responses import RedirectResponse, HTMLResponse, JSONResponse
@@ -138,7 +138,7 @@ def next_problem(
     request: Request,
     drill_type: DrillTypeEnum = Form(...),
     avoid_prompt: Optional[str] = Form(default=None),
-    avoid_pair: Optional[str] = Form(default=None),   # e.g. "×:4,6" sorted
+    avoid_pair: Optional[str] = Form(default=None),
 ):
     uid = get_user_id(request)
     if not uid: raise HTTPException(403)
@@ -156,7 +156,6 @@ def next_problem(
 
 def _friendly_fail(metrics: dict, target_time_sec: float, why: str) -> str:
     items = metrics.get("items", 20) or 20
-    # Tiered accuracy target matches star rule
     if items <= 10: A = 0.8
     elif items <= 20: A = 0.85
     else: A = 0.9
@@ -222,8 +221,6 @@ def finish_drill(
         s.commit()
 
         metrics = compute_first_try_metrics(logs)
-
-        # tolerate older DBs missing the column (but recommend dropping the DB)
         tts = getattr(prog, "target_time_sec", None)
         if not tts:
             _, _, _, _, TMAX = thresholds_for_level(prog.level)
@@ -248,11 +245,14 @@ def finish_drill(
         if did_level_up:
             prev_best_sec = (prog.best_time_ms or elapsed_ms) / 1000.0
             next_level = clamp_level(drill_type, prog.level + 1)
+            # Never choose a recap immediately after Level 1
+            lbl_next = level_label(drill_type, next_level).lower()
+            if prog.level == 1 and "recap" in lbl_next:
+                next_level = clamp_level(drill_type, next_level + 1)
             _, _, _, _, TMAX = thresholds_for_level(next_level)
             next_target = min(TMAX, prev_best_sec * 1.5)
             prog.level = next_level
             prog.last_levelup_at = datetime.utcnow()
-            # only set if the column exists (old DBs will still run; recommended to drop DB)
             try:
                 prog.target_time_sec = int(round(next_target))
             except Exception:
@@ -288,47 +288,40 @@ def finish_drill(
 # ---------- Stars-needed messaging ----------
 def _oldest_star_life_rounds(stars_recent: str) -> int:
     """
-    How many future rounds until the OLDEST existing star drops off the 5-drill window?
-    If there are no stars, return 0.
+    How many FUTURE rounds you can still play while the oldest existing star
+    remains inside the last-5 window. (So for '1----', life=4.)
     """
     s = (stars_recent or "")[-5:]
     if "1" not in s:
         return 0
     L = len(s)
-    idx = s.find("1")  # 0-based from left (oldest)
-    # life = rounds until drop:
-    # - while L<5, we can append (5-L) without dropping anything
-    # - once full, an item at index idx drops after (idx+1) more appends
-    return (5 - L) + (idx + 1)
+    idx = s.find("1")  # oldest star index (0..L-1)
+    # drop happens after K_drop = (5-L) + (idx+1) appends; usable rounds = K_drop - 1
+    return (5 - L) + idx
 
 def need_hint_text(stars_recent: str, this_star: bool) -> str:
     """
-    Friendly, simple hints:
+    Friendly, deterministic hints:
       - 0 stars: "Need 3 stars in the next 5 rounds to level up"
-      - 1 star (not dropping in next 2): "Need 2 stars in the next N rounds…"
+      - 1 star (not dropping within next 2): "Need 2 stars in the next N rounds…"
       - 2 stars (oldest not dropping next round): "Need 1 star in the next N rounds…"
-      - If a single star next round would level up: "Need a star next round to level up"
-      - Else: best effort over 2–5 using enumeration
+      - Otherwise: minimal X of next Y (2..5). Only say “next round” when X=1 & Y=1.
     """
     s = (stars_recent or "")[-5:]
-    # if a star next round would level up immediately:
-    if levelup_decision(s, True):
-        return "Need a star next round to level up"
-
     c = s.count("1")
     if c == 0:
         return "Need 3 stars in the next 5 rounds to level up"
 
-    life = _oldest_star_life_rounds(s)  # rounds until oldest star falls out
-    if c == 1 and life >= 3:
-        return f"Need 2 stars in the next {life} rounds to level up"
-    if c == 2 and life >= 2:
-        return f"Need 1 star in the next {life} rounds to level up"
+    life = _oldest_star_life_rounds(s)
+    if c == 1 and life >= 2:
+        return `Need 2 stars in the next ${life} rounds to level up`
+    if c == 2 and life >= 1:
+        return `Need 1 star in the next ${life} rounds to level up`
 
-    # fallback: brute-force minimal solution within next 2..5 rounds
+    # fallback enumeration over 1..5
     from itertools import product
-    for horizon in range(2, 6):
-        best_needed = 10
+    best = None
+    for horizon in range(1, 6):
         for seq in product([0,1], repeat=horizon):
             k = sum(seq)
             win = s
@@ -338,11 +331,13 @@ def need_hint_text(stars_recent: str, this_star: bool) -> str:
                 if win.count("1") >= 3 and win[-3:].count("1") >= 2:
                     ok = True; break
             if ok:
-                best_needed = min(best_needed, k)
-        if best_needed < 10:
-            if best_needed == 1 and horizon == 2:
-                return "Need 1 of the next 2 rounds to level up"
-            return f"Need {best_needed} of the next {horizon} rounds to level up"
+                if best is None or (k, horizon) < best:
+                    best = (k, horizon)
+        if best:
+            k, h = best
+            if k == 1 && h == 1:
+                return "Need a star next round to level up"
+            return f"Need {k} of the next {h} rounds to level up"
     return "Get 3 of your last 5 stars to level up"
 
 # ---------- API: tiles/feed/stats/reports ----------
@@ -351,7 +346,7 @@ def progress(request: Request):
     uid = get_user_id(request)
     if not uid: raise HTTPException(403)
     ensure_progress_rows(uid)
-    out = {}
+    out: Dict[str, Any] = {}
     with get_session() as s:
         for dt in DrillTypeEnum:
             prog = s.exec(select(UserProgress).where(
@@ -365,7 +360,7 @@ def progress(request: Request):
                     "level": prog.level,
                     "label": level_label(dt, prog.level),
                     "last5": sr,
-                    "ready_if_star": levelup_decision(sr, True),
+                    "ready_if_star": False,  # keep copy simple; the hint carries the plan
                     "need_msg": need_hint_text(sr, False),
                 }
     return JSONResponse(out)
@@ -391,14 +386,18 @@ def feed(request: Request):
                 .where(DrillAward.drill_result_id.in_(res_ids))
                 .where(DrillAward.award_type == "star")
             ).all()
-            star_ids = set(x for (x,) in aw)
+            # aw may be [int] or [(int,), ...] depending on driver
+            for row in aw:
+                if isinstance(row, (list, tuple)):
+                    star_ids.add(row[0])
+                else:
+                    star_ids.add(int(row))
 
     items = []
     for r in results:
         m = re.match(r"^\[L(\d+)\]\s+(.*)$", r.settings_snapshot or "")
         level_num = int(m.group(1)) if m else None
         label_part = m.group(2) if m else (r.settings_snapshot or "")
-        # separate the score (strip it from the label line)
         score_num = None
         ms = re.search(r"Score\s+(\d+)\s*/\s*(\d+)", label_part)
         if ms:
@@ -438,28 +437,10 @@ def stats(request: Request, tz_offset: int = 0):
         counts[r.drill_type.value] += 1
     return JSONResponse(counts)
 
-# ---- Heatmaps (last-5 attempts, brighter=needs work) ----
-def _last5_error_rate(rows: List[Tuple[int,int,bool,datetime]], a_range, b_range):
-    bucket: Dict[int, Dict[int, List[Tuple[datetime,bool]]]] = {a:{b:[] for b in b_range} for a in a_range}
-    for a,b,ok,ts in rows:
-        if a in bucket and b in bucket[a]:
-            bucket[a][b].append((ts, ok))
-    grid = {a:{b:None for b in b_range} for a in a_range}
-    for a in a_range:
-        for b in b_range:
-            if not bucket[a][b]:
-                grid[a][b] = None
-            else:
-                bucket[a][b].sort(key=lambda t: t[0])
-                last = [ok for _,ok in bucket[a][b][-5:]]
-                wrong = last.count(False)
-                grid[a][b] = wrong / len(last)
-    return grid
-
+# ---- Heatmaps per type (unchanged from previous fixed build) ----
 @app.get("/report/multiplication")
 def report_mul(request: Request):
-    uid = get_user_id(request)
-    if not uid: raise HTTPException(403)
+    uid = get_user_id(request); if not uid: raise HTTPException(403)
     rows: List[Tuple[int,int,bool,datetime]] = []
     with get_session() as s:
         q = s.exec(
@@ -468,17 +449,14 @@ def report_mul(request: Request):
             .where(DrillResult.user_id == uid)
             .where(DrillQuestion.drill_type == DrillTypeEnum.multiplication)
         ).all()
-    for a, b, ok, ts, _uid in q:
-        rows.append((int(a), int(b), bool(ok), ts))
+    for a, b, ok, ts, _uid in q: rows.append((int(a), int(b), bool(ok), ts))
     grid = _last5_error_rate(rows, range(1,13), range(1,13))
     return JSONResponse({"labels_from": 1, "labels_to": 12, "grid": grid})
 
 @app.get("/report/addition")
 def report_add(request: Request):
-    uid = get_user_id(request)
-    if not uid: raise HTTPException(403)
-    rng = 20
-    rows: List[Tuple[int,int,bool,datetime]] = []
+    uid = get_user_id(request); if not uid: raise HTTPException(403)
+    rng = 20; rows: List[Tuple[int,int,bool,datetime]] = []
     with get_session() as s:
         q = s.exec(
             select(DrillQuestion.a, DrillQuestion.b, DrillQuestion.correct, DrillQuestion.started_at, DrillResult.user_id)
@@ -486,17 +464,14 @@ def report_add(request: Request):
             .where(DrillResult.user_id == uid)
             .where(DrillQuestion.drill_type == DrillTypeEnum.addition)
         ).all()
-    for a, b, ok, ts, _uid in q:
-        rows.append((int(a), int(b), bool(ok), ts))
+    for a, b, ok, ts, _uid in q: rows.append((int(a), int(b), bool(ok), ts))
     grid = _last5_error_rate(rows, range(0,rng+1), range(0,rng+1))
     return JSONResponse({"labels_from": 0, "labels_to": rng, "grid": grid})
 
 @app.get("/report/subtraction")
 def report_sub(request: Request):
-    uid = get_user_id(request)
-    if not uid: raise HTTPException(403)
-    rng = 20
-    rows: List[Tuple[int,int,bool,datetime]] = []
+    uid = get_user_id(request); if not uid: raise HTTPException(403)
+    rng = 20; rows: List[Tuple[int,int,bool,datetime]] = []
     with get_session() as s:
         q = s.exec(
             select(DrillQuestion.a, DrillQuestion.b, DrillQuestion.correct, DrillQuestion.started_at, DrillResult.user_id)
@@ -504,8 +479,7 @@ def report_sub(request: Request):
             .where(DrillResult.user_id == uid)
             .where(DrillQuestion.drill_type == DrillTypeEnum.subtraction)
         ).all()
-    for a, b, ok, ts, _uid in q:
-        rows.append((int(a), int(b), bool(ok), ts))
+    for a, b, ok, ts, _uid in q: rows.append((int(a), int(b), bool(ok), ts))
     grid = _last5_error_rate(rows, range(0,rng+1), range(0,rng+1))
     return JSONResponse({"labels_from": 0, "labels_to": rng, "grid": grid})
 
@@ -532,8 +506,13 @@ def admin_login(request: Request, password: str = Form(...)):
     if not cfg or password != cfg.admin_password_plain:
         return RedirectResponse("/admin", status_code=303)
     resp = RedirectResponse("/admin", status_code=303)
-    # shorter-lived & HttpOnly so it can’t be set from client JS
     resp.set_cookie("is_admin", "1", max_age=60*60*6, samesite="lax", httponly=True)
+    return resp
+
+@app.post("/admin/logout")
+def admin_logout():
+    resp = RedirectResponse("/admin", status_code=303)
+    resp.delete_cookie("is_admin")
     return resp
 
 @app.post("/admin/delete_user")
