@@ -313,26 +313,21 @@ def report_mul(request: Request):
     if not uid: raise HTTPException(403)
     grid = {a: {b: None for b in range(1,13)} for a in range(1,13)}
     counts = {a: {b: {"ok":0, "wrong":0} for b in range(1,13)} for a in range(1,13)}
+    # Prefer a join to ensure correct user scoping
     with get_session() as s:
-        qs = s.exec(select(DrillQuestion).where(
-            DrillQuestion.user_id == uid if hasattr(DrillQuestion, "user_id") else True  # fallback if model lacks column
-        )).all()
-    # fall back: derive user_id via result join if DrillQuestion has no user_id column
-    if qs and not hasattr(qs[0], "user_id"):
-        with get_session() as s:
-            for q in s.exec(select(DrillQuestion, DrillResult.user_id).join(DrillResult, DrillQuestion.drill_result_id == DrillResult.id)).all():
-                dq, uid_fk = q  # tuple
-                if dq.drill_type != DrillTypeEnum.multiplication: continue
-                a, b = int(dq.a), int(dq.b)
-                if 1 <= a <= 12 and 1 <= b <= 12:
-                    (counts[a][b]["ok"] if dq.correct else counts[a][b]["wrong"]) += 1
-    else:
-        for dq in qs:
-            if dq.drill_type != DrillTypeEnum.multiplication: continue
-            a, b = int(dq.a), int(dq.b)
-            if 1 <= a <= 12 and 1 <= b <= 12:
-                (counts[a][b]["ok"] if dq.correct else counts[a][b]["wrong"]) += 1
-
+        rows = s.exec(
+            select(DrillQuestion, DrillResult.user_id)
+            .join(DrillResult, DrillQuestion.drill_result_id == DrillResult.id)
+        ).all()
+    for dq, uid_fk in rows:
+        if uid_fk != uid: continue
+        if dq.drill_type != DrillTypeEnum.multiplication: continue
+        a, b = int(dq.a), int(dq.b)
+        if 1 <= a <= 12 and 1 <= b <= 12:
+            if dq.correct:
+                counts[a][b]["ok"] += 1
+            else:
+                counts[a][b]["wrong"] += 1
     for a in range(1,13):
         for b in range(1,13):
             c = counts[a][b]
@@ -348,13 +343,19 @@ def report_add(request: Request):
     grid = {a: {b: None for b in range(0,rng+1)} for a in range(0,rng+1)}
     counts = {a: {b: {"ok":0, "wrong":0} for b in range(0,rng+1)} for a in range(0,rng+1)}
     with get_session() as s:
-        rows = s.exec(select(DrillQuestion, DrillResult.user_id).join(DrillResult, DrillQuestion.drill_result_id == DrillResult.id)).all()
+        rows = s.exec(
+            select(DrillQuestion, DrillResult.user_id)
+            .join(DrillResult, DrillQuestion.drill_result_id == DrillResult.id)
+        ).all()
     for dq, uid_fk in rows:
         if uid_fk != uid: continue
         if dq.drill_type != DrillTypeEnum.addition: continue
         a, b = int(dq.a), int(dq.b)
         if 0 <= a <= rng and 0 <= b <= rng:
-            (counts[a][b]["ok"] if dq.correct else counts[a][b]["wrong"]) += 1
+            if dq.correct:
+                counts[a][b]["ok"] += 1
+            else:
+                counts[a][b]["wrong"] += 1
     for a in range(0,rng+1):
         for b in range(0,rng+1):
             c = counts[a][b]; tot = c["ok"] + c["wrong"]
@@ -369,13 +370,19 @@ def report_sub(request: Request):
     grid = {a: {b: None for b in range(0,rng+1)} for a in range(0,rng+1)}
     counts = {a: {b: {"ok":0, "wrong":0} for b in range(0,rng+1)} for a in range(0,rng+1)}
     with get_session() as s:
-        rows = s.exec(select(DrillQuestion, DrillResult.user_id).join(DrillResult, DrillQuestion.drill_result_id == DrillResult.id)).all()
+        rows = s.exec(
+            select(DrillQuestion, DrillResult.user_id)
+            .join(DrillResult, DrillQuestion.drill_result_id == DrillResult.id)
+        ).all()
     for dq, uid_fk in rows:
         if uid_fk != uid: continue
         if dq.drill_type != DrillTypeEnum.subtraction: continue
         a, b = int(dq.a), int(dq.b)
         if 0 <= a <= rng and 0 <= b <= rng:
-            (counts[a][b]["ok"] if dq.correct else counts[a][b]["wrong"]) += 1
+            if dq.correct:
+                counts[a][b]["ok"] += 1
+            else:
+                counts[a][b]["wrong"] += 1
     for a in range(0,rng+1):
         for b in range(0,rng+1):
             c = counts[a][b]; tot = c["ok"] + c["wrong"]
