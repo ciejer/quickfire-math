@@ -1,96 +1,39 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="layout">
-  <section class="main-col" style="grid-column: 1 / span 2;">
-    <h1 class="title">Manager console</h1>
+  <section class="main-col">
+    <div class="row space-between">
+      <h1 class="title">Admin</h1>
+      <a class="muted-link" href="/home">← Back</a>
+    </div>
 
-    {% if not admin %}
-      <form method="post" action="/admin/login" class="row">
-        <input type="password" name="password" placeholder="Admin password" required>
-        <button class="btn btn-primary">Sign in</button>
+    {% if not authed %}
+      <form method="post" action="/admin/login" class="chooser">
+        <label>Enter admin password</label>
+        <input type="password" name="password" placeholder="password" required>
+        <div class="note">{{ hint }}</div>
+        <div style="margin-top:10px;"><button class="btn btn-primary">Sign in</button></div>
       </form>
-      <p class="note">The admin password is printed to the container logs on boot.</p>
     {% else %}
-
-      <h2>Admin password</h2>
-      <form method="post" action="/admin/password" class="row">
-        <input type="password" name="new_password" placeholder="New password" required>
-        <button class="btn btn-primary">Change</button>
-      </form>
-
-      <h2>User management</h2>
-      <form method="post" action="/admin/delete_user" class="row" onsubmit="return confirm('Delete user? This removes their history.');">
-        <select name="user_id" id="delete-user-id" required>
-          {% for u in users %}
-            <option value="{{u.id}}">{{u.display_name}}</option>
-          {% endfor %}
-        </select>
-        <button class="btn btn-danger">Delete user</button>
-      </form>
-
-      <h2>Minimum expectations</h2>
-      <form method="post" action="/admin/expectations" class="grid" id="expectations-form">
-        <div class="row">
-          <label>User
-            <select name="user_id" id="exp-user-id" required>
-              {% for u in users %}
-                <option value="{{u.id}}">{{u.display_name}}</option>
-              {% endfor %}
-            </select>
-          </label>
+      <h3>Players</h3>
+      <div class="op-cards">
+        {% for u in users %}
+        <div class="op-card">
+          <div class="op-title">{{ u.display_name }}</div>
+          <form method="post" action="/admin/delete_user" onsubmit="return confirm('Delete {{u.display_name}} and all their data?')">
+            <input type="hidden" name="user_id" value="{{u.id}}">
+            <button class="btn btn-danger">Delete</button>
+          </form>
         </div>
-
-        <fieldset>
-          <legend>Addition (required inclusion)</legend>
-          <div class="row">
-            <label>Min <input type="number" name="add_req_min" id="add_req_min"></label>
-            <label>Max <input type="number" name="add_req_max" id="add_req_max"></label>
-          </div>
-        </fieldset>
-
-        <fieldset>
-          <legend>Subtraction (required inclusion)</legend>
-          <div class="row">
-            <label>Min <input type="number" name="sub_req_min" id="sub_req_min"></label>
-            <label>Max <input type="number" name="sub_req_max" id="sub_req_max"></label>
-          </div>
-        </fieldset>
-
-        <fieldset>
-          <legend>Multiplication (both factors must include)</legend>
-          <div class="row">
-            <label>First factor min <input type="number" name="mul_a_req_min" id="mul_a_req_min"></label>
-            <label>First factor max <input type="number" name="mul_a_req_max" id="mul_a_req_max"></label>
-          </div>
-          <div class="row">
-            <label>Second factor min <input type="number" name="mul_b_req_min" id="mul_b_req_min"></label>
-            <label>Second factor max <input type="number" name="mul_b_req_max" id="mul_b_req_max"></label>
-          </div>
-        </fieldset>
-
-        <div class="row right">
-          <button class="btn btn-primary">Save expectations</button>
-        </div>
-      </form>
-
-      <p class="note"><a href="/admin/logout">Sign out</a></p>
-
-      <script>
-        async function loadExpectations(uid) {
-          const res = await fetch(`/admin/expectations/get?user_id=${encodeURIComponent(uid)}`);
-          if (!res.ok) return;
-          const v = await res.json();
-          for (const k of ["add_req_min","add_req_max","sub_req_min","sub_req_max","mul_a_req_min","mul_a_req_max","mul_b_req_min","mul_b_req_max"]) {
-            const el = document.getElementById(k);
-            if (el) el.value = v[k];
-          }
-        }
-        const sel = document.getElementById('exp-user-id');
-        sel.addEventListener('change', () => loadExpectations(sel.value));
-        // On first render
-        if (sel.value) loadExpectations(sel.value);
-      </script>
+        {% endfor %}
+      </div>
+      <div class="note">To change the admin password, stop the container and start it again; a new password will be printed.</div>
     {% endif %}
   </section>
+
+  <aside class="news-col">
+    <div class="news-head">Tip</div>
+    <div class="news-info">Only admins can delete players. The password is printed to logs on boot.</div>
+  </aside>
 </div>
 {% endblock %}
