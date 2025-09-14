@@ -3,59 +3,67 @@
 <div class="layout">
   <section class="main-col">
     <div class="row space-between">
-      <h1 class="title">Kia ora, {{ user.display_name }}</h1>
-      <a class="muted-link" href="/">← Back</a>
+      <h1 class="title">Choose a drill</h1>
+      <a class="muted-link" href="/">← Switch user</a>
     </div>
 
-    <form method="post" action="/start" class="chooser" id="choose-form">
-      <label>Choose a drill</label>
-      <div class="op-cards" id="op-cards">
-        <label class="op-card" id="card-addition">
-          <input type="radio" name="drill_type" value="addition" required>
+    <form id="choose-form" method="post" action="/start">
+      <div class="choose-grid">
+        <label id="card-addition" class="op-card">
+          <input type="radio" name="drill_type" value="addition">
           <div class="op-title">Addition</div>
-          <div class="op-level" id="level-addition">Level —</div>
+          <div class="op-sub" id="level-addition">Level 1</div>
           <div class="op-stars" id="stars-addition">☆☆☆☆☆</div>
-          <div class="op-note"><span class="badge" id="badge-addition">3 of last 5 stars → level up</span></div>
+          <div class="op-badge" id="badge-addition">Get 3 of your last 5 stars to level up</div>
         </label>
 
-        <label class="op-card" id="card-subtraction">
-          <input type="radio" name="drill_type" value="subtraction" required>
+        <label id="card-subtraction" class="op-card">
+          <input type="radio" name="drill_type" value="subtraction">
           <div class="op-title">Subtraction</div>
-          <div class="op-level" id="level-subtraction">Level —</div>
+          <div class="op-sub" id="level-subtraction">Level 1</div>
           <div class="op-stars" id="stars-subtraction">☆☆☆☆☆</div>
-          <div class="op-note"><span class="badge" id="badge-subtraction">3 of last 5 stars → level up</span></div>
+          <div class="op-badge" id="badge-subtraction">Get 3 of your last 5 stars to level up</div>
         </label>
 
-        <label class="op-card" id="card-multiplication">
-          <input type="radio" name="drill_type" value="multiplication" required>
+        <label id="card-multiplication" class="op-card">
+          <input type="radio" name="drill_type" value="multiplication">
           <div class="op-title">Multiplication</div>
-          <div class="op-level" id="level-multiplication">Level —</div>
+          <div class="op-sub" id="level-multiplication">Level 1</div>
           <div class="op-stars" id="stars-multiplication">☆☆☆☆☆</div>
-          <div class="op-note"><span class="badge" id="badge-multiplication">3 of last 5 stars → level up</span></div>
+          <div class="op-badge" id="badge-multiplication">Get 3 of your last 5 stars to level up</div>
         </label>
 
-        <label class="op-card" id="card-division">
-          <input type="radio" name="drill_type" value="division" required>
+        <label id="card-division" class="op-card">
+          <input type="radio" name="drill_type" value="division">
           <div class="op-title">Division</div>
-          <div class="op-level" id="level-division">Level —</div>
+          <div class="op-sub" id="level-division">Level 1</div>
           <div class="op-stars" id="stars-division">☆☆☆☆☆</div>
-          <div class="op-note"><span class="badge" id="badge-division">3 of last 5 stars → level up</span></div>
+          <div class="op-badge" id="badge-division">Get 3 of your last 5 stars to level up</div>
         </label>
       </div>
-      <button class="btn btn-primary">Start</button>
+
+      <div style="margin-top:14px;">
+        <button class="btn btn-primary">Start</button>
+      </div>
     </form>
 
-    <details class="expander">
+    <details class="expander" style="margin-top:18px;">
       <summary>Reports</summary>
-      <div class="reports">
-        <h3>Multiplication</h3>
-        <div id="report-mul" class="heatmap"></div>
-        <h3>Addition (0–20)</h3>
-        <div id="report-add" class="heatmap"></div>
-        <h3>Subtraction (0–20, larger − smaller)</h3>
-        <div id="report-sub" class="heatmap"></div>
-        <div class="news-info" style="margin-top:6px;">Legend: darker squares need more work (based on your last 5 attempts for each square).</div>
+      <div class="row" style="gap:18px; flex-wrap:wrap;">
+        <div style="flex:1 1 360px;">
+          <h3>Multiplication</h3>
+          <div id="report-mul"></div>
+        </div>
+        <div style="flex:1 1 360px;">
+          <h3>Addition</h3>
+          <div id="report-add"></div>
+        </div>
+        <div style="flex:1 1 360px;">
+          <h3>Subtraction</h3>
+          <div id="report-sub"></div>
+        </div>
       </div>
+      <div class="news-info">Brighter red = needs more work (last 5 attempts).</div>
     </details>
   </section>
 
@@ -70,19 +78,7 @@
     </ul>
 
     <div class="news-head">Your newsfeed</div>
-    <div id="feed-list">
-      {% if drills %}
-        {% for d in drills %}
-        <div class="news-item">
-          <div class="news-time">{{ d.created_at.strftime("%A %I:%M %p") }}</div>
-          <div class="news-settings">{{ d.settings_snapshot }}</div>
-          <div class="news-result">{{ (d.elapsed_ms//60000) }} min {{ ((d.elapsed_ms//1000)%60) }} secs</div>
-        </div>
-        {% endfor %}
-      {% else %}
-        <div class="news-empty">No drills yet — hit Start.</div>
-      {% endif %}
-    </div>
+    <div id="feed-list" class="news-list"></div>
   </aside>
 </div>
 {% endblock %}

@@ -161,8 +161,9 @@ def next_problem(
             return JSONResponse({"prompt": p, "answer": ans, "tts": tts})
     return JSONResponse({"prompt": p, "answer": ans, "tts": tts})
 
-def _friendly_fail(metrics: dict, target_time_sec: float, why: str) -> str:
-    items = metrics.get("items", 20) or 20
+def _friendly_fail(metrics: dict, target_time_sec: float, why: str, expected_items: int) -> str:
+    # Use expected 20 items to avoid messages like "8/9" when logs are partial
+    items = max(int(metrics.get("items") or 0), int(expected_items or 20))
     if items <= 10:
         A = 0.8
     elif items <= 20:
@@ -170,11 +171,13 @@ def _friendly_fail(metrics: dict, target_time_sec: float, why: str) -> str:
     else:
         A = 0.9
     need = int((A * items + 0.9999))  # ceil
-    ftc = metrics.get("first_try_correct", round(metrics.get("acc", 0.0) * items))
+    # first_try_correct best-effort: recompute from acc if missing
+    ftc = metrics.get("first_try_correct")
+    if ftc is None:
+        ftc = round(float(metrics.get("acc", 0.0)) * items)
 
     if why == "accuracy_below_gate":
-        more = max(0, need - ftc)
-        if more <= 1:
+        if need - ftc <= 1:
             return "Just one more correct and you’ll get a star!"
         return f"Great effort — {need}/{items} correct is the goal."
     if why == "too_slow":
@@ -282,7 +285,7 @@ def finish_drill(
         new_level_val = int(prog.level)
         star_bool = bool(star)
         levelup_bool = bool(did_level_up)
-        fail_msg = "" if star_bool else _friendly_fail(metrics, float(tts), exp.get("why",""))
+        fail_msg = "" if star_bool else _friendly_fail(metrics, float(tts), exp.get("why",""), question_count)
 
         s.add(prog); s.commit()
 
@@ -305,25 +308,24 @@ def finish_drill(
 def _oldest_star_life_rounds(stars_recent: str) -> int:
     """
     How many FUTURE rounds you can still play while the oldest existing star
-    remains inside the last-5 window. (For '1----', life=4 usable rounds.)
+    remains inside the last-5 window. (For '00010', life=3.)
     """
     s = (stars_recent or "")[-5:]
     if "1" not in s:
         return 0
     L = len(s)
     idx = s.find("1")  # oldest star index (0..L-1)
-    # drop happens after K_drop = (5-L) + (idx+1) appends; usable rounds = K_drop - 1
-    # => life = (5 - L) + idx
+    # drop after K_drop=(5-L)+(idx+1) appends; usable rounds = K_drop-1 = (5-L)+idx
     return (5 - L) + idx
 
 def need_hint_text(stars_recent: str, this_star: bool) -> str:
     """
     Friendly hints that account for the just-finished result.
     Examples:
-      - 0->1 stars: "Need 2 stars in the next 4 rounds to level up"
-      - 11··: "Need 1 star in the next 3 rounds to level up"
+      - fresh (00000) + star -> "Need 2 stars in the next 4 rounds"
+      - 00010 -> "Need 2 stars in the next 3 rounds"
+      - 00110 -> "Need 1 star in the next 2 rounds"
     """
-    # Include the just-earned star when computing the plan
     s0 = (stars_recent or "")[-5:]
     s = (s0 + ("1" if this_star else "0"))[-5:]
     c = s.count("1")
@@ -350,9 +352,8 @@ def need_hint_text(stars_recent: str, this_star: bool) -> str:
                 if win.count("1") >= 3 and win[-3:].count("1") >= 2:
                     ok = True
                     break
-            if ok:
-                if best is None or (k, horizon) < best:
-                    best = (k, horizon)
+            if ok and (best is None or (k, horizon) < best):
+                best = (k, horizon)
         if best:
             k, h = best
             if k == 1 and h == 1:
@@ -385,7 +386,7 @@ def progress(request: Request):
                     "level": prog.level,
                     "label": level_label(dt, prog.level),
                     "last5": sr,
-                    "ready_if_star": False,  # hint carries the plan
+                    "ready_if_star": False,
                     "need_msg": need_hint_text(sr, False),
                 }
     return JSONResponse(out)
@@ -412,7 +413,6 @@ def feed(request: Request):
                 .where(DrillAward.drill_result_id.in_(res_ids))
                 .where(DrillAward.award_type == "star")
             ).all()
-            # aw may be [int] or [(int,), ...] depending on driver
             for row in aw:
                 if isinstance(row, (list, tuple)):
                     star_ids.add(int(row[0]))
@@ -464,7 +464,7 @@ def stats(request: Request, tz_offset: int = 0):
         counts[r.drill_type.value] += 1
     return JSONResponse(counts)
 
-# ---- Heatmaps (last-5 attempts, brighter=needs work) ----
+# ---- Heatmaps (unchanged) ----
 def _last5_error_rate(rows: List[Tuple[int,int,bool,datetime]], a_range, b_range):
     bucket: Dict[int, Dict[int, List[Tuple[datetime,bool]]]] = {a:{b:[] for b in b_range} for a in a_range}
     for a,b,ok,ts in rows:

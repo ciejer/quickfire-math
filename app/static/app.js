@@ -1,7 +1,7 @@
-// time
+// ---------- time helpers ----------
 function fmtTime(ms){ const s=Math.floor(ms/1000), m=Math.floor(s/60), r=s%60; return `${m}:${r.toString().padStart(2,"0")}`; }
 
-// audio & speech
+// ---------- audio & speech ----------
 const audioCtx = typeof window!=="undefined" && "AudioContext" in window ? new AudioContext() : null;
 let mediaUnlocked=false;
 function unlockMediaOnce(){ if(mediaUnlocked) return; try{ if(audioCtx&&audioCtx.state==="suspended") audioCtx.resume(); }catch{} try{ if("speechSynthesis" in window){ speechSynthesis.getVoices(); speechSynthesis.onvoiceschanged=()=>{}; } }catch{} mediaUnlocked=true; }
@@ -13,11 +13,11 @@ function starSound(){ [659.25,783.99,987.77,1318.51].forEach((f,i)=>tone(f,0.12,
 function levelUpSound(){ [392,523.25,659.25,783.99,1046.5].forEach((f,i)=>tone(f,0.18,0.06,i*0.12)); }
 function say(text){ if(!window.speechSynthesis) return; try{ const u=new SpeechSynthesisUtterance(text); u.rate=1.05; const enNZ=speechSynthesis.getVoices().find(v=>/en[-_]NZ/i.test(v.lang)); if(enNZ) u.voice=enNZ; speechSynthesis.cancel(); speechSynthesis.speak(u);}catch{} }
 
-// digit colouring — ONLY operands & wrong-answer overlay
+// ---------- digit colouring (only operand/overlay) ----------
 function digitsToHTML(str){ return String(str).replace(/\d/g,d=>`<span class="digit d${d}">${d}</span>`); }
 function setDigits(el,text){ if(el) el.innerHTML = digitsToHTML(text); }
 
-// API
+// ---------- API ----------
 async function apiNext(type, avoid, avoidPair){ const fd=new FormData(); fd.set("drill_type",type); if(avoid) fd.set("avoid_prompt", avoid); if(avoidPair) fd.set("avoid_pair", avoidPair); const r=await fetch("/next",{method:"POST",body:fd}); if(!r.ok) throw new Error("next failed"); return r.json(); }
 async function apiFeed(){ const r=await fetch("/feed"); return r.ok? r.json(): {items:[]}; }
 async function apiStats(){ const tz=new Date().getTimezoneOffset(); const r=await fetch(`/stats?tz_offset=${encodeURIComponent(tz)}`); return r.ok? r.json(): null; }
@@ -26,10 +26,10 @@ async function apiReportMul(){ const r=await fetch("/report/multiplication"); re
 async function apiReportAdd(){ const r=await fetch("/report/addition"); return r.ok? r.json(): null; }
 async function apiReportSub(){ const r=await fetch("/report/subtraction"); return r.ok? r.json(): null; }
 
-// commutative key for duplicate avoidance (+, ×)
+// ---------- commutative key for duplicate avoidance (+, ×) ----------
 function commKey(prompt){ const m=prompt.match(/^\s*(\d+)\s*([+\u00D7])\s*(\d+)\s*$/); if(!m) return null; const a=+m[1], b=+m[3]; const op=m[2]; const lo=Math.min(a,b), hi=Math.max(a,b); return `${op}:${lo},${hi}`; }
 
-// feed + stats
+// ---------- feed + stats ----------
 function renderFeed(container,items){
   if(!container) return;
   if(!items||!items.length){ container.innerHTML='<div class="news-empty">No drills yet — hit Start.</div>'; return; }
@@ -59,7 +59,7 @@ function renderStats(listEl,s){
     <li>Division: <strong>${s.division}</strong></li>`;
 }
 
-// chooser cards
+// ---------- chooser cards ----------
 function starDots(last5){ return (last5||"").padStart(5," ").slice(-5).split("").map(c=>c==="1"?"★":"☆").join(""); }
 function renderProgressOnCards(p){
   if(!p) return;
@@ -75,6 +75,7 @@ function renderProgressOnCards(p){
     if(badge) badge.textContent = info.need_msg || "Get 3 of your last 5 stars to level up";
   });
 }
+
 function initHome(){
   const radios=[...document.querySelectorAll(".op-card input[type=radio]")];
   const cards=[...document.querySelectorAll(".op-card")];
@@ -100,7 +101,7 @@ function initHome(){
   });
 }
 
-// heatmap (brighter red = needs more work)
+// ---------- heatmap (brighter red = needs work) ----------
 function renderHeatmap(el,data,labelStart=1,labelEnd=12,withLegend=false){
   if(!el||!data||!data.grid) return;
   const g=data.grid, from=data.labels_from??labelStart, to=data.labels_to??labelEnd;
@@ -123,7 +124,7 @@ function renderHeatmap(el,data,labelStart=1,labelEnd=12,withLegend=false){
   el.innerHTML=html;
 }
 
-// drill
+// ---------- drill ----------
 function parsePrompt(prompt){ const m=prompt.match(/^\s*(\d+)\s*([+\u2212\u00D7\u00F7])\s*(\d+)\s*$/); return m?{a:m[1],op:m[2],b:m[3]}:null; }
 function renderEq(prompt){ const p=parsePrompt(prompt); if(!p) return; setDigits(document.getElementById("num-a"), p.a); setDigits(document.getElementById("num-b"), p.b); const op=document.getElementById("op"); if(op) op.textContent=p.op; }
 function insertWithin(arr,item,minAhead=3,maxAhead=5){ const pos=Math.min(arr.length, Math.floor(Math.random()*(maxAhead-minAhead+1))+minAhead); arr.splice(pos,0,item); }
@@ -143,6 +144,8 @@ function initDrill(){
   let done=0, misses=0, running=true, start=performance.now(); let lastPrompt=null;
   let currentStart=new Date(); const qlog=[]; let lastTimer="";
 
+  if(helper) helper.textContent = ""; // no "Answer to begin" during play
+
   function tick(){ if(!running) return; const now=performance.now(); const t=fmtTime(now-start); if(t!==lastTimer){ lastTimer=t; if(timerEl) timerEl.textContent=t; } requestAnimationFrame(tick); }
   requestAnimationFrame(tick);
 
@@ -160,7 +163,7 @@ function initDrill(){
   async function finish(){
     running=false; winSound();
     const elapsed=Math.floor(performance.now()-start);
-    const correctFirstTry=drill.target - misses;
+    const correctFirstTry=drill.target - misses;     // now accurate
     const fd=new FormData();
     fd.set("drill_type",drill.type);
     fd.set("elapsed_ms", String(elapsed));
@@ -174,7 +177,7 @@ function initDrill(){
     document.getElementById("equation").classList.add("finished");
     formEl.classList.add("hidden"); finishActions.classList.remove("hidden");
 
-    // refresh sidebar
+    // refresh sidebar immediately
     apiStats().then(s=>renderStats(document.getElementById("stats-list"),s));
     apiFeed().then(f=>renderFeed(document.getElementById("feed-list"), f.items));
 
@@ -186,7 +189,7 @@ function initDrill(){
       levelUpSound();
       if(nextLvlForm) nextLvlForm.classList.remove("hidden");
       if(playAgainBtn) playAgainBtn.classList.add("hidden");  // no replay on exact level-up
-      if(homeBtn) homeBtn.classList.remove("hidden");         // keep Home visible on level-up
+      if(homeBtn) homeBtn.classList.remove("hidden");
     }else{
       if(helper){
         if(gotStar){
@@ -218,13 +221,13 @@ function initDrill(){
       if(done>=drill.target){ await finish(); return; }
       await topUpQueue(); showCurrent();
     }else{
-      // track miss count for true first-try score
+      // track miss count for true first-try score (bug fix)
+      misses += 1;
+
       say(current.tts);
-      const avoidPairPrev = queue.length? commKey(queue[queue.length-1].prompt) : commKey(lastPrompt || "");
       qlog.push({prompt:current.prompt, a:+parsed.a, b:+parsed.b, correct_answer:current.answer, given_answer:val, correct:false, started_at:currentStart.toISOString(), elapsed_ms:elapsed});
       // overlay with BIG coloured digits
       const html = `${digitsToHTML(parsed.a)} <span class="op">${parsed.op}</span> ${digitsToHTML(parsed.b)} = ${digitsToHTML(String(current.answer))}`;
-      const overlay=document.getElementById("overlay"), overlayContent=document.getElementById("overlay-content");
       overlayContent.innerHTML = html;
       overlay.classList.remove("hidden");
       // queue re-ask 3–5 later

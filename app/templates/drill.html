@@ -3,11 +3,17 @@
 <div class="layout">
   <section class="main-col">
     <div class="row space-between">
-      <h1 class="title">Drill</h1>
+      <!-- no extra title here to keep the drill pane clean -->
       <a class="muted-link" href="/home">← Home</a>
     </div>
 
     <div id="settings-human" class="note">{{ settings_human }}</div>
+
+    <!-- Timer + progress ABOVE the equation -->
+    <div class="eq-meta">
+      <div class="timer" id="timer">0:00</div>
+      <div class="progress">Question <span id="q-done">0</span>/20</div>
+    </div>
 
     <div id="equation" class="equation">
       <div class="eq-col">
@@ -22,17 +28,13 @@
           <button type="submit" class="btn btn-primary enter-btn">Enter ⏎</button>
         </form>
       </div>
-      <div class="eq-meta">
-        <div class="timer" id="timer">0:00</div>
-        <div class="progress">Question <span id="q-done">0</span>/20</div>
-      </div>
     </div>
 
     <div id="overlay" class="overlay hidden">
       <div id="overlay-content" class="overlay-box">1 × 2 = 2</div>
     </div>
 
-    <div id="helper" class="helper">Answer to begin…</div>
+    <div id="helper" class="helper"></div>
 
     <div id="finish-actions" class="finish-actions hidden">
       <form id="again-form" method="post" action="/start">
