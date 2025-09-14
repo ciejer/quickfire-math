@@ -314,9 +314,9 @@ def need_hint_text(stars_recent: str, this_star: bool) -> str:
 
     life = _oldest_star_life_rounds(s)
     if c == 1 and life >= 2:
-        return `Need 2 stars in the next ${life} rounds to level up`
+        return f"Need 2 stars in the next ${life} rounds to level up"
     if c == 2 and life >= 1:
-        return `Need 1 star in the next ${life} rounds to level up`
+        return f"Need 1 star in the next ${life} rounds to level up"
 
     # fallback enumeration over 1..5
     from itertools import product
