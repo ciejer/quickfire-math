@@ -5,6 +5,8 @@ from collections import defaultdict
 from typing import Dict, List, Tuple, Any
 
 from .models import DrillTypeEnum
+from .levels import thresholds_for_level  # <-- FIX: bring thresholds into this module
+
 
 # -------------- Generation from presets
 

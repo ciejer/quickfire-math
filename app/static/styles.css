@@ -28,13 +28,7 @@ a { color: var(--accent); text-decoration: none; }
 .title { margin:0 0 10px 0; }
 .note { color:var(--muted); margin-top:10px; }
 
-/* Pills */
-.pills { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px; }
-.pill { display:flex; align-items:center; gap:8px; padding:8px 12px; border-radius:999px; background:#18204a; border:1px solid #26306a; }
-.pill .stars { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; letter-spacing:1px; color:#ffd166; }
-.pill .lvl { font-weight:800; }
-.pill.ready { border-color:#3a7; box-shadow: inset 0 0 0 1px #3a7; }
-.pill.loading { color:var(--muted); }
+/* Pills merged into cards now */
 
 /* News & stats */
 .news-head { font-weight:600; color:var(--muted); margin:12px 0 8px; }
@@ -57,13 +51,24 @@ a { color: var(--accent); text-decoration: none; }
 
 input[type="number"], input[type="text"], input[type="password"], input[type="checkbox"] { background:#0f1533; border:1px solid #26306a; color:var(--ink); padding:10px; border-radius:8px; font-size:16px; }
 
-/* Chooser & login cards */
+/* Chooser & login cards (now with level+stars inside) */
 .chooser label { display:block; margin:10px 0 6px; color:var(--muted); }
 .op-cards { display:flex; flex-wrap:wrap; gap:12px; margin:8px 0 12px; }
-.op-card { display:inline-flex; align-items:center; justify-content:center; min-width:180px; padding:16px 20px; border-radius:12px; border:1px solid #26306a; background:#18204a; cursor:pointer; user-select:none; box-shadow: inset 0 0 0 rgba(0,0,0,0); transition: transform .02s ease, box-shadow .1s ease, border-color .1s ease; }
+.op-card {
+  display:flex; flex-direction:column; align-items:flex-start; justify-content:center;
+  min-width:220px; padding:18px 20px; border-radius:14px;
+  border:1px solid #26306a; background:#18204a; cursor:pointer; user-select:none;
+  box-shadow: inset 0 0 0 rgba(0,0,0,0);
+  transition: transform .02s ease, box-shadow .1s ease, border-color .1s ease;
+}
 .op-card input { display:none; }
 .op-card.selected { border-color: var(--accent); box-shadow: inset 0 3px 8px rgba(0,0,0,.25); transform: translateY(2px); }
 .op-card:hover { border-color: var(--accent); }
+.op-title { font-size:1.05rem; font-weight:800; margin-bottom:2px; }
+.op-level { font-size:.95rem; color:#cbd0ea; margin-bottom:4px; }
+.op-stars { font-size:1.8rem; line-height:1.1; letter-spacing:2px; color:#ffd166; }
+.op-note { color:var(--muted); font-size:.85rem; margin-top:4px; }
+.op-card.ready { border-color:#3a7; box-shadow: inset 0 0 0 1px #3a7; }
 
 /* Status bar */
 .statusbar { display:flex; gap:18px; align-items:center; color:var(--muted); }
@@ -77,7 +82,7 @@ input[type="number"], input[type="text"], input[type="password"], input[type="ch
 .equation .eq-row .num { min-width:2ch; text-align:right; color: var(--ink); }
 .equation .rule { border-bottom: 3px solid #2a366b; margin:8px 0 6px; }
 
-/* Digit colouring for rendered digits */
+/* Digit colouring for rendered digits (kept for operands + overlay; we'll scope further next release) */
 .digit { font-weight: inherit; }
 .d0 { color: var(--d0); } .d1 { color: var(--d1); } .d2 { color: var(--d2); } .d3 { color: var(--d3); } .d4 { color: var(--d4); }
 .d5 { color: var(--d5); } .d6 { color: var(--d6); } .d7 { color: var(--d7); } .d8 { color: var(--d8); } .d9 { color: var(--d9); }

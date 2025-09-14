@@ -7,20 +7,41 @@
       <a class="muted-link" href="/">← Back</a>
     </div>
 
-    <!-- Progress pills -->
-    <div id="progress-pills" class="pills">
-      <!-- Populated by JS via /progress -->
-      <div class="pill loading">Loading progress…</div>
-    </div>
-
-    <!-- Choose a drill (always 20 Qs) -->
+    <!-- Choose a drill: cards now include level + stars -->
     <form method="post" action="/start" class="chooser" id="choose-form">
       <label>Choose a drill</label>
-      <div class="op-cards">
-        <label class="op-card"><input type="radio" name="drill_type" value="addition" required><span>Addition</span></label>
-        <label class="op-card"><input type="radio" name="drill_type" value="subtraction" required><span>Subtraction</span></label>
-        <label class="op-card"><input type="radio" name="drill_type" value="multiplication" required><span>Multiplication</span></label>
-        <label class="op-card"><input type="radio" name="drill_type" value="division" required><span>Division</span></label>
+      <div class="op-cards" id="op-cards">
+        <label class="op-card" id="card-addition">
+          <input type="radio" name="drill_type" value="addition" required>
+          <div class="op-title">Addition</div>
+          <div class="op-level" id="level-addition">Level —</div>
+          <div class="op-stars" id="stars-addition">☆☆☆☆☆</div>
+          <div class="op-note">Get 3/5 stars to level up</div>
+        </label>
+
+        <label class="op-card" id="card-subtraction">
+          <input type="radio" name="drill_type" value="subtraction" required>
+          <div class="op-title">Subtraction</div>
+          <div class="op-level" id="level-subtraction">Level —</div>
+          <div class="op-stars" id="stars-subtraction">☆☆☆☆☆</div>
+          <div class="op-note">Get 3/5 stars to level up</div>
+        </label>
+
+        <label class="op-card" id="card-multiplication">
+          <input type="radio" name="drill_type" value="multiplication" required>
+          <div class="op-title">Multiplication</div>
+          <div class="op-level" id="level-multiplication">Level —</div>
+          <div class="op-stars" id="stars-multiplication">☆☆☆☆☆</div>
+          <div class="op-note">Get 3/5 stars to level up</div>
+        </label>
+
+        <label class="op-card" id="card-division">
+          <input type="radio" name="drill_type" value="division" required>
+          <div class="op-title">Division</div>
+          <div class="op-level" id="level-division">Level —</div>
+          <div class="op-stars" id="stars-division">☆☆☆☆☆</div>
+          <div class="op-note">Get 3/5 stars to level up</div>
+        </label>
       </div>
       <button class="btn btn-primary">Start</button>
     </form>

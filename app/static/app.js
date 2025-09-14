@@ -41,7 +41,7 @@ function say(text) {
   } catch {}
 }
 
-// --- digit colouring (0..9) everywhere we render numbers (we'll narrow scope in next release)
+// --- digit colouring helper (we’ll narrow scope next release)
 function digitsToHTML(str) { return String(str).replace(/\d/g, (d) => `<span class="digit d${d}">${d}</span>`); }
 function setDigits(el, text) { if (el) el.innerHTML = digitsToHTML(text); }
 function colorizeDigits(container) { if (container) container.innerHTML = digitsToHTML(container.innerHTML); }
@@ -78,23 +78,32 @@ function renderStats(listEl, stats) {
   colorizeDigits(listEl);
 }
 
-// --- progress pills
-function starDots(last5){
-  // Map "10101" => "★☆★☆★"
-  return (last5 || "").padStart(5," ").slice(-5).split("").map(c => c==="1"?"★":"☆").join("");
+// --- drill selection: merge progress into the cards
+function starDots(last5){ return (last5 || "").padStart(5," ").slice(-5).split("").map(c => c==="1"?"★":"☆").join(""); }
+function levelNumber(label, fallbackLevel){
+  const m = (label||"").match(/L\s*([0-9]+)/i);
+  return m ? m[1] : (fallbackLevel ?? "—");
 }
-function renderProgress(pillsEl, data){
-  if (!pillsEl || !data) return;
-  const order = ["addition","subtraction","multiplication","division"];
-  const lines = order.map(k => {
-    const d = data[k]; if (!d) return "";
-    const ready = d.ready_if_star ? " ready" : "";
-    return `<div class="pill${ready}"><span class="lvl">${k[0].toUpperCase()+k.slice(1)} • ${d.label}</span><span class="stars">${starDots(d.last5)}</span><span class="note">— get 3/5 stars to level up</span></div>`;
-  }).join("");
-  pillsEl.innerHTML = lines || `<div class="pill loading">No progress yet — do a drill to begin.</div>`;
+function renderProgressOnCards(data){
+  if (!data) return;
+  [
+    ["addition","card-addition","level-addition","stars-addition"],
+    ["subtraction","card-subtraction","level-subtraction","stars-subtraction"],
+    ["multiplication","card-multiplication","level-multiplication","stars-multiplication"],
+    ["division","card-division","level-division","stars-division"],
+  ].forEach(([key, cardId, levelId, starsId])=>{
+    const card = document.getElementById(cardId);
+    const lvlEl = document.getElementById(levelId);
+    const stEl = document.getElementById(starsId);
+    const info = data[key];
+    if (!card || !lvlEl || !stEl || !info) return;
+    lvlEl.textContent = `Level ${levelNumber(info.label, info.level)}`;
+    stEl.textContent = starDots(info.last5);
+    card.classList.toggle("ready", !!info.ready_if_star);
+  });
 }
 
-// --- heatmaps (unchanged)
+// --- heatmap
 function renderHeatmap(el, data, labelStart=1, labelEnd=12) {
   if (!el || !data || !data.grid) return;
   const g = data.grid, from = data.labels_from ?? labelStart, to = data.labels_to ?? labelEnd;
@@ -115,7 +124,7 @@ function renderHeatmap(el, data, labelStart=1, labelEnd=12) {
   colorizeDigits(el);
 }
 
-// --- login click to submit
+// --- login: click name to submit
 function initLogin() {
   const form = document.getElementById("login-form");
   if (!form) return;
@@ -134,7 +143,7 @@ function initHome() {
 
   fetchStats().then((s)=>renderStats(document.getElementById("stats-list"), s));
   fetchFeed().then((f)=>renderFeed(document.getElementById("feed-list"), f.items));
-  fetchProgress().then((p)=>renderProgress(document.getElementById("progress-pills"), p));
+  fetchProgress().then((p)=>renderProgressOnCards(p));
 
   // Reports on demand
   const repMul = document.getElementById("report-mul");
@@ -205,7 +214,8 @@ function initDrill() {
     fd.set("score", String(correctFirstTry));
     fd.set("qlog", JSON.stringify(qlog));
     const res = await fetch("/finish", { method:"POST", body:fd });
-    const pay = await res.json();
+    let pay = {};
+    try { pay = await res.json(); } catch {}
 
     document.getElementById("equation").classList.add("finished");
     formEl.classList.add("hidden"); finishActions.classList.remove("hidden");
@@ -218,7 +228,6 @@ function initDrill() {
     const starTxt = pay.star ? "⭐ Star earned" : "No star this time";
     if (helper) helper.innerHTML = `${starTxt} — Time ${digitsToHTML(fmtTime(elapsed))} • Score ${digitsToHTML(`${correctFirstTry}/20`)}<br>${awards || " "}<br><span class="note">Get 3 of your last 5 stars to level up.</span>`;
 
-    // Show "Start next level" if level up
     if (pay.level_up && nextLvlForm) nextLvlForm.classList.remove("hidden");
   }
 
