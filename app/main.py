@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os, secrets, random, json
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Optional, Dict, List, Tuple
 
 from fastapi import FastAPI, Request, Form, HTTPException
 from fastapi.responses import RedirectResponse, HTMLResponse, JSONResponse
@@ -15,7 +15,7 @@ from .models import (
     User, UserSettings, DrillResult, DrillQuestion,
     DrillTypeEnum, AdminConfig, UserProgress, DrillAward
 )
-from .levels import get_preset, clamp_level, level_label
+from .levels import get_preset, clamp_level, level_label, thresholds_for_level
 from .logic import (
     generate_from_preset, compute_first_try_metrics, ewma_update,
     star_decision, levelup_decision
@@ -139,14 +139,36 @@ def next_problem(
     uid = get_user_id(request)
     if not uid: raise HTTPException(403)
     _, _, preset = level_info(uid, drill_type)
-
     # try to avoid immediate duplicates (up to 10 attempts)
     for _ in range(10):
         p, ans, tts = generate_from_preset(drill_type, preset)
         if not avoid_prompt or p != avoid_prompt:
             return JSONResponse({"prompt": p, "answer": ans, "tts": tts})
-    # give up gracefully
     return JSONResponse({"prompt": p, "answer": ans, "tts": tts})
+
+def _friendly_fail(metrics: dict, level: int, total_time_ms: int, ewma_tpq_ms: float | None, why: str) -> str:
+    A, CAP, DELTA, HM, TMAX = thresholds_for_level(level)
+    items = metrics.get("items", 20) or 20
+    ftc = metrics.get("first_try_correct", round(metrics.get("acc", 0.0) * items))
+    if why == "accuracy_below_gate":
+        need = int((A * items + 0.9999))  # ceil
+        more = max(0, need - ftc)
+        if more <= 1:
+            return "Just one more correct and you’ll get a star!"
+        return f"Great effort — {need}/{items} correct is the goal."
+    if why == "over_total_time_cap":
+        return f"Just a bit faster — finish under {TMAX} minutes for a star."
+    if why == "too_many_hard_mistakes":
+        return "Try not to repeat the same mistake — fewer double-mistakes next time."
+    if why == "too_slow":
+        cap = f"{CAP:.1f}"
+        if ewma_tpq_ms is not None:
+            target = max(CAP, (ewma_tpq_ms/1000.0)*(1-DELTA))
+            return f"Speed it up — aim for about {target:.1f}s per question."
+        return f"Speed it up — aim for under {cap}s per question."
+    if why == "no_first_try_timing":
+        return "One more go — keep answers snappy on the first try."
+    return "So close — one more push and you’ll have it!"
 
 @app.post("/finish")
 def finish_drill(
@@ -179,13 +201,13 @@ def finish_drill(
                 started = datetime.fromisoformat(str(e.get("started_at")).replace("Z",""))
             except Exception:
                 started = datetime.utcnow()
-            s.add(DrillQuestion(
+            dq = DrillQuestion(
                 drill_result_id=rec.id, drill_type=drill_type,
                 a=int(e.get("a", 0)), b=int(e.get("b", 0)), prompt=str(e.get("prompt","")),
                 correct_answer=int(e.get("correct_answer",0)), given_answer=int(e.get("given_answer",0)),
-                correct=bool(e.get("correct", False)),
-                started_at=started, elapsed_ms=int(e.get("elapsed_ms",0)),
-            ))
+                correct=bool(e.get("correct", False)), started_at=started, elapsed_ms=int(e.get("elapsed_ms",0)),
+            )
+            s.add(dq)
         s.commit()
 
         prog = s.exec(select(UserProgress).where(
@@ -215,7 +237,7 @@ def finish_drill(
         sr_before = prog.stars_recent or ""
         did_level_up = levelup_decision(sr_before, star)
 
-        # append this drill to history (keep last 6 just for cushion)
+        # append this drill
         prog.stars_recent = (sr_before + ("1" if star else "0"))[-6:]
 
         if did_level_up:
@@ -229,6 +251,12 @@ def finish_drill(
             prog.ewma_acc = None
             awards.append(("level_up", f"⬆️ Level up to {level_label(drill_type, prog.level)}"))
 
+        # read scalars BEFORE session closes/commits to avoid DetachedInstance on return
+        new_level_val = int(prog.level)
+        star_bool = bool(star)
+        levelup_bool = bool(did_level_up)
+        fail_msg = "" if star_bool else _friendly_fail(metrics, new_level_val, elapsed_ms, prog.ewma_tpq_ms, exp.get("why",""))
+
         s.add(prog); s.commit()
 
         for (t, text) in awards:
@@ -237,10 +265,11 @@ def finish_drill(
 
     return JSONResponse({
         "ok": True,
-        "star": bool(star),
-        "level_up": bool(did_level_up),
-        "new_level": prog.level,
+        "star": star_bool,
+        "level_up": levelup_bool,
+        "new_level": new_level_val,
         "awards": [a for _, a in awards],
+        "fail_msg": fail_msg,
         "explain": {"need": "Earn 3 of your last 5 stars to level up."},
     })
 
@@ -260,8 +289,8 @@ def progress(request: Request):
                 out[dt.value] = {"level": 1, "label": level_label(dt, 1), "last5": "", "ready_if_star": False}
             else:
                 out[dt.value] = {
-                    "level": prog.level,
-                    "label": level_label(dt, prog.level),
+                    "level": prog.level,                 # numeric level (sequential)
+                    "label": level_label(dt, prog.level),# friendly descriptive text
                     "last5": (prog.stars_recent or "")[-5:],
                     "ready_if_star": levelup_decision(prog.stars_recent or "", True),
                 }
@@ -283,14 +312,11 @@ def feed(request: Request):
 
 @app.get("/stats")
 def stats(request: Request, tz_offset: int = 0):
-    """tz_offset is minutes from UTC (window.getTimezoneOffset())"""
     uid = get_user_id(request)
     if not uid: raise HTTPException(403)
-    # convert "now UTC" to local using tz_offset (note: NZ is -720)
     local_now = datetime.utcnow() - timedelta(minutes=tz_offset)
     local_start = datetime(local_now.year, local_now.month, local_now.day)
     local_end = local_start + timedelta(days=1)
-    # back to UTC for querying
     start_utc = local_start + timedelta(minutes=tz_offset)
     end_utc = local_end + timedelta(minutes=tz_offset)
 
@@ -307,32 +333,42 @@ def stats(request: Request, tz_offset: int = 0):
         counts[r.drill_type.value] += 1
     return JSONResponse(counts)
 
+# ---- Helpers to compute LAST-5 heatmaps
+def _last5_error_rate(rows: List[Tuple[int,int,bool,datetime]], a_range, b_range):
+    # rows: list of (a, b, correct, started_at)
+    bucket: Dict[int, Dict[int, List[bool]]] = {a:{b:[] for b in b_range} for a in a_range}
+    for a,b,ok,ts in rows:
+        if a in bucket and b in bucket[a]:
+            bucket[a][b].append((ts, ok))
+    grid = {a:{b:None for b in b_range} for a in a_range}
+    for a in a_range:
+        for b in b_range:
+            if not bucket[a][b]:
+                grid[a][b] = None
+            else:
+                bucket[a][b].sort(key=lambda t: t[0])
+                last = [ok for _,ok in bucket[a][b][-5:]]
+                if not last:
+                    grid[a][b] = None
+                else:
+                    wrong = last.count(False)
+                    grid[a][b] = wrong / len(last)
+    return grid
+
 @app.get("/report/multiplication")
 def report_mul(request: Request):
     uid = get_user_id(request)
     if not uid: raise HTTPException(403)
-    grid = {a: {b: None for b in range(1,13)} for a in range(1,13)}
-    counts = {a: {b: {"ok":0, "wrong":0} for b in range(1,13)} for a in range(1,13)}
-    # Prefer a join to ensure correct user scoping
+    rows: List[Tuple[int,int,bool,datetime]] = []
     with get_session() as s:
-        rows = s.exec(
-            select(DrillQuestion, DrillResult.user_id)
-            .join(DrillResult, DrillQuestion.drill_result_id == DrillResult.id)
+        q = s.exec(
+            select(DrillQuestion.a, DrillQuestion.b, DrillQuestion.correct, DrillQuestion.started_at, DrillResult.user_id)
+            .join(DrillResult, DrillResult.id == DrillQuestion.drill_result_id)
+            .where(DrillResult.user_id == uid)
         ).all()
-    for dq, uid_fk in rows:
-        if uid_fk != uid: continue
-        if dq.drill_type != DrillTypeEnum.multiplication: continue
-        a, b = int(dq.a), int(dq.b)
-        if 1 <= a <= 12 and 1 <= b <= 12:
-            if dq.correct:
-                counts[a][b]["ok"] += 1
-            else:
-                counts[a][b]["wrong"] += 1
-    for a in range(1,13):
-        for b in range(1,13):
-            c = counts[a][b]
-            tot = c["ok"] + c["wrong"]
-            grid[a][b] = None if tot == 0 else (c["wrong"] / tot)  # 0 good .. 1 bad
+    for a, b, ok, ts, _uid in q:
+        rows.append((int(a), int(b), bool(ok), ts))
+    grid = _last5_error_rate(rows, range(1,13), range(1,13))
     return JSONResponse({"labels_from": 1, "labels_to": 12, "grid": grid})
 
 @app.get("/report/addition")
@@ -340,26 +376,16 @@ def report_add(request: Request):
     uid = get_user_id(request)
     if not uid: raise HTTPException(403)
     rng = 20
-    grid = {a: {b: None for b in range(0,rng+1)} for a in range(0,rng+1)}
-    counts = {a: {b: {"ok":0, "wrong":0} for b in range(0,rng+1)} for a in range(0,rng+1)}
+    rows: List[Tuple[int,int,bool,datetime]] = []
     with get_session() as s:
-        rows = s.exec(
-            select(DrillQuestion, DrillResult.user_id)
-            .join(DrillResult, DrillQuestion.drill_result_id == DrillResult.id)
+        q = s.exec(
+            select(DrillQuestion.a, DrillQuestion.b, DrillQuestion.correct, DrillQuestion.started_at, DrillResult.user_id)
+            .join(DrillResult, DrillResult.id == DrillQuestion.drill_result_id)
+            .where(DrillResult.user_id == uid)
         ).all()
-    for dq, uid_fk in rows:
-        if uid_fk != uid: continue
-        if dq.drill_type != DrillTypeEnum.addition: continue
-        a, b = int(dq.a), int(dq.b)
-        if 0 <= a <= rng and 0 <= b <= rng:
-            if dq.correct:
-                counts[a][b]["ok"] += 1
-            else:
-                counts[a][b]["wrong"] += 1
-    for a in range(0,rng+1):
-        for b in range(0,rng+1):
-            c = counts[a][b]; tot = c["ok"] + c["wrong"]
-            grid[a][b] = None if tot == 0 else (c["wrong"] / tot)
+    for a, b, ok, ts, _uid in q:
+        rows.append((int(a), int(b), bool(ok), ts))
+    grid = _last5_error_rate(rows, range(0,rng+1), range(0,rng+1))
     return JSONResponse({"labels_from": 0, "labels_to": rng, "grid": grid})
 
 @app.get("/report/subtraction")
@@ -367,26 +393,16 @@ def report_sub(request: Request):
     uid = get_user_id(request)
     if not uid: raise HTTPException(403)
     rng = 20
-    grid = {a: {b: None for b in range(0,rng+1)} for a in range(0,rng+1)}
-    counts = {a: {b: {"ok":0, "wrong":0} for b in range(0,rng+1)} for a in range(0,rng+1)}
+    rows: List[Tuple[int,int,bool,datetime]] = []
     with get_session() as s:
-        rows = s.exec(
-            select(DrillQuestion, DrillResult.user_id)
-            .join(DrillResult, DrillQuestion.drill_result_id == DrillResult.id)
+        q = s.exec(
+            select(DrillQuestion.a, DrillQuestion.b, DrillQuestion.correct, DrillQuestion.started_at, DrillResult.user_id)
+            .join(DrillResult, DrillResult.id == DrillQuestion.drill_result_id)
+            .where(DrillResult.user_id == uid)
         ).all()
-    for dq, uid_fk in rows:
-        if uid_fk != uid: continue
-        if dq.drill_type != DrillTypeEnum.subtraction: continue
-        a, b = int(dq.a), int(dq.b)
-        if 0 <= a <= rng and 0 <= b <= rng:
-            if dq.correct:
-                counts[a][b]["ok"] += 1
-            else:
-                counts[a][b]["wrong"] += 1
-    for a in range(0,rng+1):
-        for b in range(0,rng+1):
-            c = counts[a][b]; tot = c["ok"] + c["wrong"]
-            grid[a][b] = None if tot == 0 else (c["wrong"] / tot)
+    for a, b, ok, ts, _uid in q:
+        rows.append((int(a), int(b), bool(ok), ts))
+    grid = _last5_error_rate(rows, range(0,rng+1), range(0,rng+1))
     return JSONResponse({"labels_from": 0, "labels_to": rng, "grid": grid})
 
 # ---------- Admin (minimal: delete users) ----------
@@ -421,7 +437,6 @@ def admin_delete_user(request: Request, user_id: int = Form(...)):
     if not _is_admin(request):
         raise HTTPException(403)
     with get_session() as s:
-        # delete drill questions -> results -> settings -> progress -> user
         s.exec(delete(DrillQuestion).where(DrillQuestion.drill_result_id.in_(
             select(DrillResult.id).where(DrillResult.user_id == user_id)
         )))

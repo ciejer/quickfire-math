@@ -1,7 +1,7 @@
-// time utils
+// time
 function fmtTime(ms){ const s=Math.floor(ms/1000), m=Math.floor(s/60), r=s%60; return `${m}:${r.toString().padStart(2,"0")}`; }
 
-// audio + speech
+// audio & speech
 const audioCtx = typeof window!=="undefined" && "AudioContext" in window ? new AudioContext() : null;
 let mediaUnlocked=false;
 function unlockMediaOnce(){ if(mediaUnlocked) return; try{ if(audioCtx&&audioCtx.state==="suspended") audioCtx.resume(); }catch{} try{ if("speechSynthesis" in window){ speechSynthesis.getVoices(); speechSynthesis.onvoiceschanged=()=>{}; } }catch{} mediaUnlocked=true; }
@@ -24,7 +24,7 @@ async function apiReportMul(){ const r=await fetch("/report/multiplication"); re
 async function apiReportAdd(){ const r=await fetch("/report/addition"); return r.ok? r.json(): null; }
 async function apiReportSub(){ const r=await fetch("/report/subtraction"); return r.ok? r.json(): null; }
 
-// feed + stats (NO digit colouring here)
+// feed + stats
 function renderFeed(container,items){
   if(!container) return;
   if(!items||!items.length){ container.innerHTML='<div class="news-empty">No drills yet — hit Start.</div>'; return; }
@@ -44,9 +44,8 @@ function renderStats(listEl,s){
     <li>Division: <strong>${s.division}</strong></li>`;
 }
 
-// drill selection tiles
+// chooser cards
 function starDots(last5){ return (last5||"").padStart(5," ").slice(-5).split("").map(c=>c==="1"?"★":"☆").join(""); }
-function levelNumber(label,fallback){ const m=(label||"").match(/(\d+)/); return m? m[1]: (fallback??"—"); }
 function renderProgressOnCards(p){
   if(!p) return;
   [["addition","card-addition","level-addition","stars-addition","badge-addition"],
@@ -56,7 +55,8 @@ function renderProgressOnCards(p){
   .forEach(([k,cardId,levelId,starsId,badgeId])=>{
     const card=document.getElementById(cardId), lvlEl=document.getElementById(levelId), stEl=document.getElementById(starsId), badge=document.getElementById(badgeId);
     const info=p[k]; if(!card||!lvlEl||!stEl||!info) return;
-    lvlEl.textContent = `Level ${levelNumber(info.label, info.level)}`;
+    // show the true numeric level (sequential), not parsed from label text
+    lvlEl.textContent = `Level ${info.level}`;
     stEl.textContent = starDots(info.last5);
     if(badge) badge.textContent = info.ready_if_star? "One more star → level up" : "3 of last 5 stars → level up";
   });
@@ -78,16 +78,16 @@ function initHome(){
     d.addEventListener("toggle", async ()=>{
       if(d.open && !d.dataset.loaded){
         d.dataset.loaded="1";
-        apiReportMul().then(data=>renderHeatmap(repMul,data,1,12));
-        apiReportAdd().then(data=>renderHeatmap(repAdd,data,data?.labels_from??0,data?.labels_to??20));
-        apiReportSub().then(data=>renderHeatmap(repSub,data,data?.labels_from??0,data?.labels_to??20));
+        apiReportMul().then(data=>renderHeatmap(repMul,data,1,12,true));
+        apiReportAdd().then(data=>renderHeatmap(repAdd,data,data?.labels_from??0,data?.labels_to??20,true));
+        apiReportSub().then(data=>renderHeatmap(repSub,data,data?.labels_from??0,data?.labels_to??20,true));
       }
     });
   });
 }
 
-// heatmap (error rate: 0 good … 1 bad)
-function renderHeatmap(el,data,labelStart=1,labelEnd=12){
+// heatmap
+function renderHeatmap(el,data,labelStart=1,labelEnd=12,withLegend=false){
   if(!el||!data||!data.grid) return;
   const g=data.grid, from=data.labels_from??labelStart, to=data.labels_to??labelEnd;
   let header=`<div class="hm-row hm-head"><span></span>`; for(let x=from;x<=to;x++) header+=`<span>${x}</span>`; header+=`</div>`;
@@ -97,12 +97,15 @@ function renderHeatmap(el,data,labelStart=1,labelEnd=12){
     for(let b=from;b<=to;b++){
       const v=(g[a]&&g[a][b]!==undefined)?g[a][b]:null;
       let bg="rgba(255,255,255,0.06)";
-      if(v!==null){ const clamped=Math.max(0,Math.min(1,v)); const alpha=0.1+clamped*0.7; bg=`rgba(255,80,80,${alpha})`; }
+      if(v!==null){ const clamped=Math.max(0,Math.min(1,v)); const alpha=0.08+clamped*0.75; bg=`rgba(255,80,80,${alpha})`; }
       html+=`<span class="hm-cell" title="${a},${b}" style="background:${bg}"></span>`;
     }
     html+=`</div>`;
   }
   html+=`</div>`;
+  if(withLegend){
+    html+=`<div class="news-info" style="margin-top:6px;">Legend: darker squares need more work (last 5 attempts).</div>`;
+  }
   el.innerHTML=html;
 }
 
@@ -133,7 +136,6 @@ function initDrill(){
     while(queue.length<6 && done+queue.length<drill.target){
       const avoid = queue.length? queue[queue.length-1].prompt : lastPrompt;
       const nxt = await apiNext(drill.type, avoid);
-      // additional client-side guard
       if(avoid && nxt.prompt===avoid) continue;
       queue.push({prompt:nxt.prompt, answer:nxt.answer, tts:nxt.tts});
     }
@@ -159,11 +161,18 @@ function initDrill(){
     apiStats().then(s=>renderStats(document.getElementById("stats-list"),s));
     apiFeed().then(f=>renderFeed(document.getElementById("feed-list"), f.items));
 
+    // Determine star robustly
+    const gotStar = !!(pay && (pay.star || (Array.isArray(pay.awards) && pay.awards.join(" ").toLowerCase().includes("star"))));
     const helper=document.getElementById("helper");
-    const awards=(pay.awards||[]).join(" • ");
-    const starTxt = pay.star ? "⭐ Star earned" : "No star this time";
-    if(helper) helper.textContent = `${starTxt} — Time ${fmtTime(elapsed)} • Score ${correctFirstTry}/20` + (awards? ` • ${awards}` : "") + " • Get 3 of your last 5 stars to level up.";
-    if(pay.level_up && nextLvlForm) nextLvlForm.classList.remove("hidden");
+    if(helper){
+      if(gotStar){
+        helper.textContent = `⭐ Star earned — Time ${fmtTime(elapsed)} • Score ${correctFirstTry}/20 • Get 3 of your last 5 stars to level up.`;
+      }else{
+        const msg = pay && pay.fail_msg ? pay.fail_msg : "No star this time — keep going!";
+        helper.textContent = `No star this time — ${msg} • Time ${fmtTime(elapsed)} • Score ${correctFirstTry}/20.`;
+      }
+    }
+    if(pay && pay.level_up && nextLvlForm) nextLvlForm.classList.remove("hidden");
   }
 
   formEl.addEventListener("submit", async (e)=>{
@@ -196,8 +205,6 @@ function initDrill(){
   renderEq(queue[0].prompt);
   topUpQueue(); ansEl.focus();
 }
-
-// heatmap styles come from CSS
 
 document.addEventListener("DOMContentLoaded", ()=>{
   if(document.getElementById("choose-form")) initHome();

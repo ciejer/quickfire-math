@@ -7,7 +7,6 @@ from typing import Dict, List, Tuple, Any
 from .models import DrillTypeEnum
 from .levels import thresholds_for_level
 
-
 def _rand(a: int, b: int) -> int:
     if a > b: a, b = b, a
     return random.randint(a, b)
@@ -15,8 +14,7 @@ def _rand(a: int, b: int) -> int:
 def _choose(seq):
     return random.choice(seq)
 
-# ----------------- Generation from presets (with recap bias + anti-dupe) -----------------
-
+# ----------------- Generation from presets (with recap bias) -----------------
 def _choose_with_bias(full_list: list[int], focus: list[int], weight_focus: float = 0.6) -> int:
     if not focus:
         return _choose(full_list)
@@ -29,16 +27,13 @@ def generate_from_preset(drill_type: DrillTypeEnum, preset: Dict[str, Any]) -> T
     if drill_type == DrillTypeEnum.multiplication:
         a = _rand(preset["a_min"], preset["a_max"])
         b_list = list(preset["b_set"])
-        # recap bias if present
         b_focus = list(preset.get("recap_focus", []))
         b = _choose_with_bias(b_list, b_focus, float(preset.get("recap_weight", 0.6)))
-
         if preset.get("bias_hard"):
             if random.random() < 0.5:
                 a = max(a, _rand(max(preset["a_min"], 6), preset["a_max"]))
                 if b < 7:
                     b = _choose([7,8,9,10,11,12])
-        # randomise order for display variety (mathematically the same)
         if random.random() < 0.5:
             a, b = b, a
         ans = a * b
@@ -82,7 +77,6 @@ def generate_from_preset(drill_type: DrillTypeEnum, preset: Dict[str, Any]) -> T
     raise ValueError("Unsupported drill type")
 
 # ----------------- Metrics + star rule -----------------
-
 def compute_first_try_metrics(qlog: List[dict]) -> dict:
     attempts_by_prompt: Dict[str, List[dict]] = defaultdict(list)
     for e in qlog:
@@ -112,20 +106,19 @@ def compute_first_try_metrics(qlog: List[dict]) -> dict:
 
     acc = (first_try_correct / total_items) if total_items else 0.0
     tpq_ms = (tpq_sum_ms / first_try_correct) if first_try_correct else None
-    return {"items": total_items, "acc": acc, "tpq_ms": tpq_ms, "hard_mistakes": hard_mistakes}
+    return {
+        "items": total_items,
+        "first_try_correct": first_try_correct,
+        "acc": acc,
+        "tpq_ms": tpq_ms,
+        "hard_mistakes": hard_mistakes
+    }
 
 def ewma_update(old: float | None, new: float, alpha: float = 0.25) -> float:
     if old is None: return new
     return alpha * new + (1 - alpha) * old
 
 def star_decision(level: int, metrics: dict, total_time_ms: int, ewma_tpq_ms: float | None) -> Tuple[bool, dict]:
-    """
-    Gates:
-      - Accuracy >= A(level)
-      - Speed: TPQ <= CAP(level) OR (TPQ <= EWMA_TPQ * (1 - DELTA(level)))
-      - Hard mistakes <= HM(level)
-      - total_time <= TMAX(level)
-    """
     A, CAP, DELTA, HM, TMAX = thresholds_for_level(level)
     exp = {"A":A, "CAP":CAP, "DELTA":DELTA, "HM":HM, "TMAX":TMAX,
            "acc":metrics["acc"], "tpq_ms":metrics["tpq_ms"], "hard_mistakes":metrics["hard_mistakes"]}

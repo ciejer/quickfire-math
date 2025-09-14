@@ -4,7 +4,7 @@
   <section class="main-col">
     <div class="row space-between">
       <h1 class="title">Admin</h1>
-      <a class="muted-link" href="/home">← Back</a>
+      <a class="muted-link" href="/">← Back</a>
     </div>
 
     {% if not authed %}
@@ -27,7 +27,7 @@
         </div>
         {% endfor %}
       </div>
-      <div class="note">To change the admin password, stop the container and start it again; a new password will be printed.</div>
+      <div class="news-info">To change the admin password, restart the container; a new password will be printed to logs.</div>
     {% endif %}
   </section>
 
