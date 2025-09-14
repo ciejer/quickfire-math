@@ -5,7 +5,7 @@ from collections import defaultdict
 from typing import Dict, List, Tuple, Any
 
 from .models import DrillTypeEnum
-from .levels import thresholds_for_level  # <-- FIX: bring thresholds into this module
+from .levels import thresholds_for_level
 
 
 # -------------- Generation from presets
@@ -27,6 +27,9 @@ def generate_from_preset(drill_type: DrillTypeEnum, preset: Dict[str, Any]) -> T
             if random.random() < 0.5:
                 a = max(a, _rand(max(preset["a_min"], 6), preset["a_max"]))
                 b = max(b, _choose([7,8,9,10,11,12]))
+        # randomise order for variety (display only)
+        if random.random() < 0.5:
+            a, b = b, a
         ans = a * b
         return (f"{a} × {b}", ans, f"{a} times {b} equals {ans}")
 
@@ -35,12 +38,13 @@ def generate_from_preset(drill_type: DrillTypeEnum, preset: Dict[str, Any]) -> T
         a, b = _rand(lo, hi), _rand(lo, hi)
         # encourage carrying sometimes
         if random.random() < preset.get("carry_bias", 0.0):
-            # try to force a carry in ones column for 2-digit numbers
             a = max(10, _rand(10, max(10, hi)))
             b = max(10, _rand(10, max(10, hi)))
             while (a % 10) + (b % 10) < 10 and random.random() < 0.8:
                 a = _rand(10, max(10, hi))
                 b = _rand(10, max(10, hi))
+        if random.random() < 0.5:
+            a, b = b, a
         ans = a + b
         return (f"{a} + {b}", ans, f"{a} plus {b} equals {ans}")
 
@@ -71,11 +75,6 @@ def generate_from_preset(drill_type: DrillTypeEnum, preset: Dict[str, Any]) -> T
 # -------------- Metrics + star rule
 
 def compute_first_try_metrics(qlog: List[dict]) -> dict:
-    """
-    qlog entries: {prompt,a,b,correct_answer,given_answer,correct,started_at,elapsed_ms}
-    We consider the first attempt of each unique prompt; if it's correct => counts to ACC and TPQ.
-    HARD mistakes = number of prompts with >=2 wrong attempts before first correct (or 2 wrong total if never correct).
-    """
     attempts_by_prompt: Dict[str, List[dict]] = defaultdict(list)
     for e in qlog:
         attempts_by_prompt[e["prompt"]].append(e)
@@ -86,7 +85,6 @@ def compute_first_try_metrics(qlog: List[dict]) -> dict:
     hard_mistakes = 0
 
     for prompt, attempts in attempts_by_prompt.items():
-        # order by started_at just in case
         attempts.sort(key=lambda x: x["started_at"])
         if not attempts:
             continue
@@ -95,7 +93,6 @@ def compute_first_try_metrics(qlog: List[dict]) -> dict:
         if first["correct"]:
             first_try_correct += 1
             tpq_sum_ms += int(first.get("elapsed_ms", 0))
-        # hard mistake = two wrong before first correct (or two wrong total if never correct)
         wrong_before_correct = 0
         for a in attempts:
             if a["correct"]:
@@ -106,12 +103,7 @@ def compute_first_try_metrics(qlog: List[dict]) -> dict:
 
     acc = (first_try_correct / total_items) if total_items else 0.0
     tpq_ms = (tpq_sum_ms / first_try_correct) if first_try_correct else None
-    return {
-        "items": total_items,
-        "acc": acc,
-        "tpq_ms": tpq_ms,
-        "hard_mistakes": hard_mistakes,
-    }
+    return {"items": total_items, "acc": acc, "tpq_ms": tpq_ms, "hard_mistakes": hard_mistakes}
 
 
 def ewma_update(old: float | None, new: float, alpha: float = 0.25) -> float:
@@ -135,47 +127,31 @@ def star_decision(level: int, metrics: dict, total_time_ms: int, ewma_tpq_ms: fl
         "acc": metrics["acc"], "tpq_ms": metrics["tpq_ms"], "hard_mistakes": metrics["hard_mistakes"],
     }
 
-    # Accuracy gate
     if metrics["acc"] < A:
-        exp["why"] = "accuracy_below_gate"
-        return False, exp
-
-    # Time cap (whole drill)
+        exp["why"] = "accuracy_below_gate"; return False, exp
     if total_time_ms > TMAX * 1000:
-        exp["why"] = "over_total_time_cap"
-        return False, exp
-
-    # Hard mistakes
+        exp["why"] = "over_total_time_cap"; return False, exp
     if metrics["hard_mistakes"] > HM:
-        exp["why"] = "too_many_hard_mistakes"
-        return False, exp
+        exp["why"] = "too_many_hard_mistakes"; return False, exp
 
-    # Speed gate: if no tpq (0 first-try correct), fail
     tpq_ms = metrics["tpq_ms"]
+    # Fallback: if no per-question timing (shouldn't happen), derive from total time / items
+    if tpq_ms is None and metrics["items"] > 0:
+        tpq_ms = total_time_ms / max(1, metrics["items"])
+
     if tpq_ms is None:
-        exp["why"] = "no_first_try_correct"
-        return False, exp
+        exp["why"] = "no_first_try_timing"; return False, exp
 
     abs_ok = (tpq_ms / 1000.0) <= CAP
-    imp_ok = False
-    if ewma_tpq_ms is not None:
-        imp_ok = tpq_ms <= ewma_tpq_ms * (1.0 - DELTA)
+    imp_ok = (ewma_tpq_ms is not None) and (tpq_ms <= ewma_tpq_ms * (1.0 - DELTA))
 
     if not (abs_ok or imp_ok):
-        exp["why"] = "too_slow"
-        return False, exp
+        exp["why"] = "too_slow"; return False, exp
 
-    exp["why"] = "ok"
-    return True, exp
+    exp["why"] = "ok"; return True, exp
 
 
 def levelup_decision(stars_recent: str, this_star: bool) -> bool:
-    """
-    Level up when:
-      - >=3 stars in last 5 (including this drill), AND
-      - >=2 stars in last 3 (including this drill), AND
-      - this_star is True (latest drill a star)
-    """
     s = (stars_recent + ("1" if this_star else "0"))[-5:]
     last5 = s.count("1")
     last3 = s[-3:].count("1")

@@ -7,7 +7,7 @@
       <a class="muted-link" href="/">← Back</a>
     </div>
 
-    <!-- Choose a drill: cards now include level + stars -->
+    <!-- Choose a drill: merged level+stars in big 2-up cards -->
     <form method="post" action="/start" class="chooser" id="choose-form">
       <label>Choose a drill</label>
       <div class="op-cards" id="op-cards">
@@ -16,7 +16,7 @@
           <div class="op-title">Addition</div>
           <div class="op-level" id="level-addition">Level —</div>
           <div class="op-stars" id="stars-addition">☆☆☆☆☆</div>
-          <div class="op-note">Get 3/5 stars to level up</div>
+          <div class="op-note"><span class="badge" id="badge-addition">3 of last 5 stars → level up</span></div>
         </label>
 
         <label class="op-card" id="card-subtraction">
@@ -24,7 +24,7 @@
           <div class="op-title">Subtraction</div>
           <div class="op-level" id="level-subtraction">Level —</div>
           <div class="op-stars" id="stars-subtraction">☆☆☆☆☆</div>
-          <div class="op-note">Get 3/5 stars to level up</div>
+          <div class="op-note"><span class="badge" id="badge-subtraction">3 of last 5 stars → level up</span></div>
         </label>
 
         <label class="op-card" id="card-multiplication">
@@ -32,7 +32,7 @@
           <div class="op-title">Multiplication</div>
           <div class="op-level" id="level-multiplication">Level —</div>
           <div class="op-stars" id="stars-multiplication">☆☆☆☆☆</div>
-          <div class="op-note">Get 3/5 stars to level up</div>
+          <div class="op-note"><span class="badge" id="badge-multiplication">3 of last 5 stars → level up</span></div>
         </label>
 
         <label class="op-card" id="card-division">
@@ -40,13 +40,12 @@
           <div class="op-title">Division</div>
           <div class="op-level" id="level-division">Level —</div>
           <div class="op-stars" id="stars-division">☆☆☆☆☆</div>
-          <div class="op-note">Get 3/5 stars to level up</div>
+          <div class="op-note"><span class="badge" id="badge-division">3 of last 5 stars → level up</span></div>
         </label>
       </div>
       <button class="btn btn-primary">Start</button>
     </form>
 
-    <!-- Reports (collapsible) -->
     <details class="expander">
       <summary>Reports</summary>
       <div class="reports">
