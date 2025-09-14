@@ -7,76 +7,25 @@
       <a class="muted-link" href="/">← Back</a>
     </div>
 
+    <!-- Progress pills -->
+    <div id="progress-pills" class="pills">
+      <!-- Populated by JS via /progress -->
+      <div class="pill loading">Loading progress…</div>
+    </div>
+
     <!-- Choose a drill (always 20 Qs) -->
     <form method="post" action="/start" class="chooser" id="choose-form">
       <label>Choose a drill</label>
       <div class="op-cards">
-        {% if st.add_enabled %}<label class="op-card"><input type="radio" name="drill_type" value="addition" required><span>Addition</span></label>{% endif %}
-        {% if st.sub_enabled %}<label class="op-card"><input type="radio" name="drill_type" value="subtraction" required><span>Subtraction</span></label>{% endif %}
-        {% if st.mul_enabled %}<label class="op-card"><input type="radio" name="drill_type" value="multiplication" required><span>Multiplication</span></label>{% endif %}
-        {% if st.div_enabled %}<label class="op-card"><input type="radio" name="drill_type" value="division" required><span>Division</span></label>{% endif %}
+        <label class="op-card"><input type="radio" name="drill_type" value="addition" required><span>Addition</span></label>
+        <label class="op-card"><input type="radio" name="drill_type" value="subtraction" required><span>Subtraction</span></label>
+        <label class="op-card"><input type="radio" name="drill_type" value="multiplication" required><span>Multiplication</span></label>
+        <label class="op-card"><input type="radio" name="drill_type" value="division" required><span>Division</span></label>
       </div>
       <button class="btn btn-primary">Start</button>
     </form>
 
-    <!-- Your settings (collapsible) -->
-    <details class="expander">
-      <summary>Settings</summary>
-      <form id="settings-form" class="grid">
-        <input type="hidden" name="user_id" value="{{ user.id }}">
-
-        <fieldset>
-          <legend>Addition</legend>
-          <label><input type="checkbox" name="add_enabled" {% if st.add_enabled %}checked{% endif %}> Enabled</label>
-          <div class="row">
-            <label>Smallest number <input type="number" name="add_min" value="{{ st.add_min }}"></label>
-            <label>Largest number <input type="number" name="add_max" value="{{ st.add_max }}"></label>
-          </div>
-        </fieldset>
-
-        <fieldset>
-          <legend>Subtraction</legend>
-          <label><input type="checkbox" name="sub_enabled" {% if st.sub_enabled %}checked{% endif %}> Enabled</label>
-          <div class="row">
-            <label>Smallest number <input type="number" name="sub_min" value="{{ st.sub_min }}"></label>
-            <label>Largest number <input type="number" name="sub_max" value="{{ st.sub_max }}"></label>
-          </div>
-        </fieldset>
-
-        <fieldset>
-          <legend>Multiplication</legend>
-          <label><input type="checkbox" name="mul_enabled" {% if st.mul_enabled %}checked{% endif %}> Enabled</label>
-          <div class="row">
-            <label>First factor min <input type="number" name="mul_a_min" value="{{ st.mul_a_min }}"></label>
-            <label>First factor max <input type="number" name="mul_a_max" value="{{ st.mul_a_max }}"></label>
-          </div>
-          <div class="row">
-            <label>Second factor min <input type="number" name="mul_b_min" value="{{ st.mul_b_min }}"></label>
-            <label>Second factor max <input type="number" name="mul_b_max" value="{{ st.mul_b_max }}"></label>
-          </div>
-        </fieldset>
-
-        <fieldset>
-          <legend>Division</legend>
-          <label><input type="checkbox" name="div_enabled" {% if st.div_enabled %}checked{% endif %}> Enabled</label>
-          <div class="row">
-            <label>Quotient min <input type="number" name="div_q_min" value="{{ st.div_q_min }}"></label>
-            <label>Quotient max <input type="number" name="div_q_max" value="{{ st.div_q_max }}"></label>
-          </div>
-          <div class="row">
-            <label>Divisor min <input type="number" name="div_divisor_min" value="{{ st.div_divisor_min }}"></label>
-            <label>Divisor max <input type="number" name="div_divisor_max" value="{{ st.div_divisor_max }}"></label>
-          </div>
-        </fieldset>
-
-        <div class="row right">
-          <button class="btn btn-primary" type="button" id="save-settings">Save</button>
-          <span id="save-msg" class="note"></span>
-        </div>
-      </form>
-    </details>
-
-    <!-- Performance (collapsible) -->
+    <!-- Reports (collapsible) -->
     <details class="expander">
       <summary>Reports</summary>
       <div class="reports">
@@ -115,17 +64,5 @@
       {% endif %}
     </div>
   </aside>
-
-  <script>
-    // Save settings via fetch to surface validation messages
-    document.getElementById('save-settings').addEventListener('click', async () => {
-      const form = document.getElementById('settings-form');
-      const msg = document.getElementById('save-msg');
-      const fd = new FormData(form);
-      const res = await fetch('/settings/update', { method: 'POST', body: fd });
-      if (res.ok) { msg.textContent = 'Saved!'; setTimeout(()=>msg.textContent='', 2000); }
-      else { msg.textContent = await res.text(); }
-    });
-  </script>
 </div>
 {% endblock %}

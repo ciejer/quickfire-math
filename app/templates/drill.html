@@ -4,7 +4,7 @@
   <section class="main-col">
     <div class="statusbar">
       <div>Type: <strong>{{ drill_type }}</strong></div>
-      <div>Settings: <strong id="settings-human">{{ settings_human }}</strong></div>
+      <div>Level: <strong id="settings-human">{{ settings_human }}</strong></div>
       <div>Q:<strong><span id="q-done">0</span>/<span id="q-total">{{ target_count }}</span></strong></div>
       <div class="timer" id="timer">0:00</div>
     </div>
@@ -14,22 +14,24 @@
       <div class="eq-row"><span class="num" id="num-a"></span></div>
       <div class="eq-row"><span class="op" id="op"></span><span class="num" id="num-b"></span></div>
       <div class="rule"></div>
-
-      <!-- Answer aligned right, button out to the far right -->
       <form id="answer-form" class="answer">
         <input id="answer" inputmode="numeric" autocomplete="off" placeholder="Answer" required class="answer-input">
+        <button class="btn btn-primary" type="submit">Enter</button>
       </form>
     </div>
 
     <div class="helper" id="helper"></div>
 
-    <!-- Finish actions: equal size buttons -->
     <div id="finish-actions" class="finish-actions hidden">
       <form id="again-form" method="post" action="/start" class="finish-form">
         <input type="hidden" name="drill_type" value="{{ drill_type }}">
         <button class="btn btn-primary btn-wide" type="submit">Play again</button>
-        <button class="btn btn-secondary btn-wide" type="button" onclick="location.href='/home'">Home</button>
       </form>
+      <form id="nextlvl-form" method="post" action="/start" class="finish-form hidden">
+        <input type="hidden" name="drill_type" value="{{ drill_type }}">
+        <button class="btn btn-secondary btn-wide" type="submit">Start next level</button>
+      </form>
+      <a class="btn btn-secondary btn-wide" href="/home">Home</a>
     </div>
   </section>
 
@@ -55,6 +57,5 @@ window.DRILL = {
 };
 </script>
 
-<!-- Visual overlay for wrong answer -->
 <div id="overlay" class="overlay hidden"><div class="overlay-content" id="overlay-content"></div></div>
 {% endblock %}

@@ -41,14 +41,10 @@ function say(text) {
   } catch {}
 }
 
-// --- digit colouring (0..9) everywhere we render numbers
-function digitsToHTML(str) {
-  return String(str).replace(/\d/g, (d) => `<span class="digit d${d}">${d}</span>`);
-}
-function setDigits(el, text) {
-  if (!el) return;
-  el.innerHTML = digitsToHTML(text);
-}
+// --- digit colouring (0..9) everywhere we render numbers (we'll narrow scope in next release)
+function digitsToHTML(str) { return String(str).replace(/\d/g, (d) => `<span class="digit d${d}">${d}</span>`); }
+function setDigits(el, text) { if (el) el.innerHTML = digitsToHTML(text); }
+function colorizeDigits(container) { if (container) container.innerHTML = digitsToHTML(container.innerHTML); }
 
 // --- API
 async function fetchNext(type){ const fd = new FormData(); fd.set("drill_type", type);
@@ -58,6 +54,7 @@ async function fetchStats(){ const tz = new Date().getTimezoneOffset(); const r 
 async function fetchReportMul(){ const r = await fetch("/report/multiplication"); return r.ok ? r.json() : null; }
 async function fetchReportAdd(){ const r = await fetch("/report/addition"); return r.ok ? r.json() : null; }
 async function fetchReportSub(){ const r = await fetch("/report/subtraction"); return r.ok ? r.json() : null; }
+async function fetchProgress(){ const r = await fetch("/progress"); return r.ok ? r.json() : null; }
 
 // --- feed + stats
 function renderFeed(container, items) {
@@ -68,6 +65,7 @@ function renderFeed(container, items) {
     const mins = Math.floor(d.elapsed_ms / 60000), secs = Math.floor((d.elapsed_ms / 1000) % 60);
     return `<div class="news-item"><div class="news-time">${fmt(d.ts)}</div><div class="news-settings">${d.settings}</div><div class="news-result">${mins} min ${secs} secs</div></div>`;
   }).join("");
+  colorizeDigits(container);
 }
 function renderStats(listEl, stats) {
   if (!listEl || !stats) return;
@@ -77,9 +75,26 @@ function renderStats(listEl, stats) {
     <li>Subtraction: <strong>${stats.subtraction}</strong></li>
     <li>Multiplication: <strong>${stats.multiplication}</strong></li>
     <li>Division: <strong>${stats.division}</strong></li>`;
+  colorizeDigits(listEl);
 }
 
-// --- heatmap
+// --- progress pills
+function starDots(last5){
+  // Map "10101" => "★☆★☆★"
+  return (last5 || "").padStart(5," ").slice(-5).split("").map(c => c==="1"?"★":"☆").join("");
+}
+function renderProgress(pillsEl, data){
+  if (!pillsEl || !data) return;
+  const order = ["addition","subtraction","multiplication","division"];
+  const lines = order.map(k => {
+    const d = data[k]; if (!d) return "";
+    const ready = d.ready_if_star ? " ready" : "";
+    return `<div class="pill${ready}"><span class="lvl">${k[0].toUpperCase()+k.slice(1)} • ${d.label}</span><span class="stars">${starDots(d.last5)}</span><span class="note">— get 3/5 stars to level up</span></div>`;
+  }).join("");
+  pillsEl.innerHTML = lines || `<div class="pill loading">No progress yet — do a drill to begin.</div>`;
+}
+
+// --- heatmaps (unchanged)
 function renderHeatmap(el, data, labelStart=1, labelEnd=12) {
   if (!el || !data || !data.grid) return;
   const g = data.grid, from = data.labels_from ?? labelStart, to = data.labels_to ?? labelEnd;
@@ -97,9 +112,10 @@ function renderHeatmap(el, data, labelStart=1, labelEnd=12) {
   }
   html += `</div>`;
   el.innerHTML = html;
+  colorizeDigits(el);
 }
 
-// --- login: click name to submit
+// --- login click to submit
 function initLogin() {
   const form = document.getElementById("login-form");
   if (!form) return;
@@ -118,7 +134,9 @@ function initHome() {
 
   fetchStats().then((s)=>renderStats(document.getElementById("stats-list"), s));
   fetchFeed().then((f)=>renderFeed(document.getElementById("feed-list"), f.items));
+  fetchProgress().then((p)=>renderProgress(document.getElementById("progress-pills"), p));
 
+  // Reports on demand
   const repMul = document.getElementById("report-mul");
   const repAdd = document.getElementById("report-add");
   const repSub = document.getElementById("report-sub");
@@ -137,12 +155,11 @@ function initHome() {
 // --- drill
 function parsePrompt(prompt){ const m = prompt.match(/^\s*(\d+)\s*([+\u2212\u00D7\u00F7])\s*(\d+)\s*$/); return m ? { a:m[1], op:m[2], b:m[3] } : null; }
 function renderEquationFromPrompt(prompt) {
-  const parts = parsePrompt(prompt); if (!parts) return;
-  setDigits(document.getElementById("num-a"), parts.a);
-  setDigits(document.getElementById("num-b"), parts.b);
-  const op = document.getElementById("op"); if (op) op.textContent = parts.op;
+  const p = parsePrompt(prompt); if (!p) return;
+  setDigits(document.getElementById("num-a"), p.a);
+  setDigits(document.getElementById("num-b"), p.b);
+  const op = document.getElementById("op"); if (op) op.textContent = p.op;
 }
-
 function insertWithin(arr, item, minAhead=3, maxAhead=5){
   const pos = Math.min(arr.length, Math.floor(Math.random()*(maxAhead-minAhead+1))+minAhead); arr.splice(pos, 0, item);
 }
@@ -153,12 +170,11 @@ function initDrill() {
   const ansEl = document.getElementById("answer");
   const formEl = document.getElementById("answer-form");
   const qDoneEl = document.getElementById("q-done");
-  const qTotalEl = document.getElementById("q-total");
   const timerEl = document.getElementById("timer");
   const finishActions = document.getElementById("finish-actions");
+  const nextLvlForm = document.getElementById("nextlvl-form");
   const overlay = document.getElementById("overlay");
   const overlayContent = document.getElementById("overlay-content");
-  if (qTotalEl) setDigits(qTotalEl, qTotalEl.textContent || "20");
 
   let queue = [{ prompt: drill.first.prompt, answer: drill.first.answer, tts: drill.first.tts }];
   let done = 0, misses = 0, running = true, start = performance.now();
@@ -175,7 +191,6 @@ function initDrill() {
   requestAnimationFrame(tick);
 
   function showCurrent(){ if (!queue.length) return; renderEquationFromPrompt(queue[0].prompt); ansEl.value = ""; ansEl.focus(); currentStart = new Date(); }
-
   async function topUpQueue(){ while (queue.length < 6 && done + queue.length < drill.target) { const nxt = await fetchNext(drill.type); queue.push({ prompt:nxt.prompt, answer:nxt.answer, tts:nxt.tts }); } }
 
   async function finish(){
@@ -189,7 +204,8 @@ function initDrill() {
     fd.set("question_count", String(drill.target));
     fd.set("score", String(correctFirstTry));
     fd.set("qlog", JSON.stringify(qlog));
-    await fetch("/finish", { method:"POST", body:fd });
+    const res = await fetch("/finish", { method:"POST", body:fd });
+    const pay = await res.json();
 
     document.getElementById("equation").classList.add("finished");
     formEl.classList.add("hidden"); finishActions.classList.remove("hidden");
@@ -198,7 +214,12 @@ function initDrill() {
     fetchFeed().then((f)=>renderFeed(document.getElementById("feed-list"), f.items));
 
     const helper = document.getElementById("helper");
-    if (helper) helper.innerHTML = `Nice one! Time: ${fmtTime(elapsed)} • Score ${`${correctFirstTry}/20`}`;
+    const awards = (pay.awards || []).join(" • ");
+    const starTxt = pay.star ? "⭐ Star earned" : "No star this time";
+    if (helper) helper.innerHTML = `${starTxt} — Time ${digitsToHTML(fmtTime(elapsed))} • Score ${digitsToHTML(`${correctFirstTry}/20`)}<br>${awards || " "}<br><span class="note">Get 3 of your last 5 stars to level up.</span>`;
+
+    // Show "Start next level" if level up
+    if (pay.level_up && nextLvlForm) nextLvlForm.classList.remove("hidden");
   }
 
   formEl.addEventListener("submit", async (e) => {
@@ -216,7 +237,7 @@ function initDrill() {
       if (done >= drill.target) { await finish(); return; }
       await topUpQueue(); showCurrent();
     } else {
-      misses += 1; say(current.tts);
+      say(current.tts);
       qlog.push({ prompt: current.prompt, a:+parsed.a, b:+parsed.b, correct_answer: current.answer, given_answer: val, correct: false, started_at: currentStart.toISOString(), elapsed_ms: elapsed });
       overlayContent.innerHTML = `${digitsToHTML(parsed.a)} <span class="op">${parsed.op}</span> ${digitsToHTML(parsed.b)} = ${digitsToHTML(String(current.answer))}`;
       overlay.classList.remove("hidden");
