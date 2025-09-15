@@ -46,6 +46,7 @@ def progress_payload(uid: int) -> Dict[str, dict]:
                     "label": level_label(dt, prog.level),
                     "last5": sr,
                     "ready_if_star": False,
-                    "need_msg": need_hint_text(sr, False),
+                    # On dashboard, do not include a hypothetical current drill
+                    "need_msg": need_hint_text(sr, None),
                 }
     return out

@@ -9,9 +9,19 @@ def _oldest_star_life_rounds(stars_recent: str) -> int:
     idx = s.find("1")  # oldest star index
     return (5 - L) + idx
 
-def need_hint_text(stars_recent: str, this_star: bool) -> str:
+def need_hint_text(stars_recent: str, this_star: Optional[bool]) -> str:
+    """
+    Build the progression hint based on the rolling last-5 window.
+
+    this_star semantics:
+      - True/False: include the just-finished drill in the window (used at end-of-drill)
+      - None: do not append anything; use only existing history (used on dashboard)
+    """
     s0 = (stars_recent or "")[-5:]
-    s = (s0 + ("1" if this_star else "0"))[-5:]
+    if this_star is None:
+        s = s0
+    else:
+        s = (s0 + ("1" if this_star else "0"))[-5:]
     c = s.count("1")
 
     if c == 0:
