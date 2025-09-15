@@ -34,16 +34,29 @@
 
     <div id="helper" class="helper"></div>
 
-    <div id="finish-actions" class="finish-actions hidden">
-      <form id="again-form" method="post" action="/start">
-        <input type="hidden" name="drill_type" value="{{ drill_type }}">
-        <button id="play-again-btn" class="btn">Play again</button>
-      </form>
-      <form id="nextlvl-form" class="hidden" method="post" action="/start">
-        <input type="hidden" name="drill_type" value="{{ drill_type }}">
-        <button class="btn btn-primary">Start next level</button>
-      </form>
-      <a id="home-btn" class="btn btn-secondary" href="/dashboard">Dashboard</a>
+    <!-- Celebration overlay (shown at end of drill) -->
+    <div id="celebrate" class="cele-overlay hidden">
+      <div class="cele-card">
+        <div id="cele-emoji" class="cele-emoji">⭐</div>
+        <h2 id="cele-title" class="cele-title">Great job!</h2>
+        <div id="cele-sub" class="cele-sub">Drill complete — ready for another round?</div>
+        <div id="cele-stats" class="cele-stats">Time 0:00 • Score 20/20</div>
+        <div class="cele-stars-wrap">
+          <div class="cele-stars-label">Last five stars</div>
+          <div id="cele-stars" class="cele-stars">☆☆☆☆☆</div>
+        </div>
+        <div id="finish-actions" class="cele-actions">
+          <form id="again-form" method="post" action="/start">
+            <input type="hidden" name="drill_type" value="{{ drill_type }}">
+            <button id="play-again-btn" class="btn btn-primary">Play again</button>
+          </form>
+          <form id="nextlvl-form" class="hidden" method="post" action="/start">
+            <input type="hidden" name="drill_type" value="{{ drill_type }}">
+            <button class="btn btn-primary">Start next level</button>
+          </form>
+          <a id="home-btn" class="btn btn-secondary" href="/dashboard">Dashboard</a>
+        </div>
+      </div>
     </div>
 
     <script>

@@ -9,7 +9,17 @@ function unlockMediaOnce(){ if(mediaUnlocked) return; try{ if(audioCtx&&audioCtx
 function tone(f,d=0.12,g=0.04,w=0){ if(!audioCtx) return; const o=audioCtx.createOscillator(), a=audioCtx.createGain(); o.type="sine"; o.frequency.value=f; a.gain.value=g; o.connect(a); a.connect(audioCtx.destination); o.start(audioCtx.currentTime+w); o.stop(audioCtx.currentTime+w+d); }
 function ding(){ tone(880,0.08,0.06); }
 function winSound(){ [523.25,659.25,783.99].forEach((f,i)=>tone(f,0.15,0.05,i*0.1)); }
-function starSound(){ [659.25,783.99,987.77,1318.51].forEach((f,i)=>tone(f,0.12,0.06,i*0.08)); }
+function starSound(){
+  // A brighter, longer flourish with harmonies
+  const seq=[659.25,783.99,987.77,1174.66,1318.51,1567.98];
+  seq.forEach((f,i)=>{
+    tone(f,0.12,0.07,i*0.07);
+    // add a soft harmony a fifth above for sparkle
+    tone(f*1.5,0.1,0.045,i*0.07+0.03);
+  });
+  // final accent
+  tone(1975.53,0.18,0.06,seq.length*0.07);
+}
 function levelUpSound(){ [392,523.25,659.25,783.99,1046.5].forEach((f,i)=>tone(f,0.18,0.06,i*0.12)); }
 function say(text){ if(!window.speechSynthesis) return; try{ const u=new SpeechSynthesisUtterance(text); u.rate=1.05; const enNZ=speechSynthesis.getVoices().find(v=>/en[-_]NZ/i.test(v.lang)); if(enNZ) u.voice=enNZ; speechSynthesis.cancel(); speechSynthesis.speak(u);}catch{} }
 
