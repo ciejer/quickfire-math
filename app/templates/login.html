@@ -9,9 +9,24 @@
 
     <div class="user-grid">
       {% for u in users %}
-        <form method="post" action="/login">
+        {% set r = recent.get(u.id) if recent else None %}
+        <form method="post" action="/login" class="user-tile-form">
           <input type="hidden" name="user_id" value="{{ u.id }}">
-          <button class="user-card" type="submit">{{ u.display_name }}</button>
+          <button class="user-card" type="submit">
+            <div class="user-name">{{ u.display_name }}</div>
+            {% if r %}
+            <div class="user-sub">
+              Last: {{ r.type|capitalize }}
+              {% if r.level %}
+                • Level <span class="lvl-num" data-level="{{ r.level }}">{{ r.level }}</span>
+              {% endif %}
+              {% if r.star %} • <span class="user-star" title="Star earned">★</span>{% endif %}
+              • {{ (r.elapsed_ms // 60000) }}:{{ ((r.elapsed_ms // 1000) % 60)|string|zfill(2) }}
+            </div>
+            {% else %}
+            <div class="user-sub muted">No drills yet — be the first!</div>
+            {% endif %}
+          </button>
         </form>
       {% endfor %}
     </div>

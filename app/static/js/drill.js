@@ -170,5 +170,10 @@
     topUpQueue(); ansEl.focus();
   }
 
-  document.addEventListener("DOMContentLoaded", ()=>{ if(window.DRILL) initDrill(); });
+  document.addEventListener("DOMContentLoaded", ()=>{ 
+    if(window.DRILL){ 
+      initDrill(); 
+      try{ const ln=document.getElementById('level-num'); if(ln){ QF.setDigits(ln, String(window.DRILL.level||ln.textContent||'')); } }catch(e){}
+    }
+  });
 })();

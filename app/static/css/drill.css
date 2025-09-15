@@ -54,3 +54,7 @@
   font-size:5rem; font-weight:900; letter-spacing:-0.02em;
 }
 .overlay-box .op{ color:var(--fg-muted); }
+.level-banner{
+  margin:8px 0 6px; font-weight:900; font-size:1.3rem;
+}
+.level-banner .level-label{ color:var(--fg-muted); font-weight:700; }

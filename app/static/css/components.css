@@ -59,20 +59,27 @@
 /* Login users (2-column) */
 .user-grid{
   display:grid;
-  grid-template-columns: repeat(2, minmax(260px, 1fr));
-  gap:12px;
+  grid-template-columns: repeat(2, minmax(320px, 1fr));
+  gap:14px;
 }
 @media (max-width: 640px){ .user-grid{ grid-template-columns: 1fr; } }
 .user-card{
-  display:block; padding:14px;
-  background: linear-gradient(180deg, #26365a, #222f4d);
-  border:1px solid #3e5a93;
+  display:block; padding:18px 20px;
+  background: radial-gradient(800px 400px at -10% -20%, rgba(118,179,255,.10), transparent 60%),
+              radial-gradient(600px 400px at 120% 0%, rgba(127,227,181,.08), transparent 60%),
+              linear-gradient(180deg, #26365a, #222f4d);
+  border:1px solid #4c6fb0;
   border-radius: var(--radius);
-  box-shadow: 0 12px 28px rgba(16,34,60,.35);
-  text-align:center;
-  font-size:1.2rem; font-weight:800; cursor:pointer; color:var(--fg);
+  box-shadow: 0 14px 32px rgba(16,34,60,.38);
+  text-align:left;
+  cursor:pointer; color:var(--fg);
 }
-.user-card:hover{ border-color:#5d87d1; }
+.user-card:hover{ border-color:#6a93df; }
+.user-name{ font-size:1.8rem; font-weight:900; letter-spacing:-0.01em; }
+.user-sub{ margin-top:8px; color:var(--fg-muted); font-weight:600; }
+.user-sub .user-star{ color:#ffd86b; }
+.user-sub .lvl-num{ font-weight:900; }
+.user-tile-form{ display:block; }
 
 .badge{ display:inline-block; padding:4px 8px; border-radius:999px; background:#2a3550; border:1px solid #35507d; color:var(--fg); }
 .center{ text-align:center; }

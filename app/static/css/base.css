@@ -69,6 +69,16 @@ a:hover { text-decoration: underline; }
 .btn-secondary{ background: #232a3a; }
 .btn-danger{ background: var(--danger); border-color: transparent; color:#2a0f14; }
 
+/* Fun CTA button for Start */
+.btn-cta{
+  font-size: 1.2rem; font-weight: 900; padding: 14px 22px; border-radius: 14px;
+  background: linear-gradient(180deg, #7FE3B5, #76B3FF);
+  color:#0d1a33; border: none;
+  box-shadow: 0 14px 28px rgba(118,179,255,.35);
+}
+.btn-cta:hover{ filter: brightness(1.05); }
+.btn-cta:active{ transform: translateY(1px); }
+
 .list{ list-style: none; padding: 0; margin: 0; }
 .list li{ padding: 8px 0; border-bottom: 1px solid var(--border); }
 .list li:last-child{ border-bottom: 0; }

@@ -13,6 +13,10 @@
       <div class="progress">Question <span id="q-done">0</span>/20</div>
     </div>
 
+    <div class="level-banner">
+      Level <span id="level-num">{{ level_num }}</span>: <span class="level-label">{{ settings_human }}</span>
+    </div>
+
     <div id="equation" class="equation">
       <div class="eq-col">
         <div id="num-a" class="eq-num">12</div>
@@ -63,7 +67,8 @@
       window.DRILL = {
         type: "{{ drill_type }}",
         target: {{ target_count }},
-        first: {prompt: "{{ first_prompt }}", answer: {{ first_answer }}, tts: "{{ first_tts }}"}
+        first: {prompt: "{{ first_prompt }}", answer: {{ first_answer }}, tts: "{{ first_tts }}"},
+        level: {{ level_num or 1 }}
       };
     </script>
   </section>

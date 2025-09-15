@@ -27,7 +27,7 @@ def start_drill(request: Request, drill_type: DrillTypeEnum = Form(...)):
     return templates.TemplateResponse("drill.html", {
         "request": request, "drill_type": drill_type.value,
         "target_count": 20, "first_prompt": p, "first_answer": ans, "first_tts": tts,
-        "settings_human": lbl
+        "settings_human": lbl, "level_num": int(lvl)
     })
 
 @router.post("/next")

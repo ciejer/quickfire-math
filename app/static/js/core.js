@@ -77,7 +77,8 @@ function renderProgressOnCards(p){
   .forEach(([k,cardId,levelId,starsId,badgeId])=>{
     const card=document.getElementById(cardId), lvlEl=document.getElementById(levelId), stEl=document.getElementById(starsId), badge=document.getElementById(badgeId);
     const info=p[k]; if(!card||!lvlEl||!stEl||!info) return;
-    lvlEl.textContent = `Level ${info.level}`;
+    const lvlHTML = `Level ${digitsToHTML(String(info.level))}: ${info.label}`;
+    lvlEl.innerHTML = lvlHTML;
     stEl.textContent = starDots(info.last5);
     if(badge) badge.textContent = info.need_msg || "Get 3 of your last 5 stars to level up";
   });

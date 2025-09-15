@@ -3,7 +3,7 @@ from fastapi.responses import RedirectResponse, HTMLResponse
 from sqlmodel import select
 from ..deps import templates
 from ..storage import get_session
-from ..models import User, UserSettings, DrillTypeEnum, UserProgress
+from ..models import User, UserSettings, DrillTypeEnum, UserProgress, DrillResult, DrillAward
 from ..levels import thresholds_for_level
 
 router = APIRouter()
@@ -12,7 +12,35 @@ router = APIRouter()
 def login(request: Request):
     with get_session() as s:
         users = list(s.exec(select(User)).all())
-    return templates.TemplateResponse("login.html", {"request": request, "users": users, "app_name": "Quickfire Math"})
+        # Gather a small "recent" summary for each user: last drill and star flag
+        recent = {}
+        for u in users:
+            last = s.exec(
+                select(DrillResult).where(DrillResult.user_id == u.id).order_by(DrillResult.created_at.desc())
+            ).first()
+            if not last:
+                recent[u.id] = None
+                continue
+            star = bool(s.exec(
+                select(DrillAward).where(DrillAward.drill_result_id == last.id, DrillAward.award_type == "star")
+            ).first())
+            # Parse level from settings_snapshot like "[L7] ..."
+            level_num = None
+            snap = last.settings_snapshot or ""
+            if snap.startswith("[L"):
+                try:
+                    level_num = int(snap.split("[")[1].split("]")[0].lstrip("L"))
+                except Exception:
+                    level_num = None
+            recent[u.id] = {
+                "type": last.drill_type.value,
+                "level": level_num,
+                "elapsed_ms": last.elapsed_ms,
+                "star": star,
+                "score": None,
+                "snapshot": snap,
+            }
+    return templates.TemplateResponse("login.html", {"request": request, "users": users, "recent": recent, "app_name": "Quickfire Math"})
 
 @router.post("/login")
 def do_login(user_id: int = Form(...)):
