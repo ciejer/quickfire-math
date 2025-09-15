@@ -1,5 +1,4 @@
 def friendly_fail_message(metrics: dict, target_time_sec: float, why: str, expected_items: int) -> str:
-    """Produce a concise, kid-friendly reason for no-star outcome."""
     items = max(int(metrics.get("items") or 0), int(expected_items or 20))
     if items <= 10:
         A = 0.8

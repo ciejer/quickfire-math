@@ -3,7 +3,7 @@ import os
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from .deps import templates  # noqa: F401  (ensures template dir exists)
+from .deps import templates  # noqa: F401  (ensure templates directory exists)
 from .storage import init_db
 from .utils.admin_pwd import ensure_admin_password
 
@@ -34,7 +34,7 @@ def create_app() -> FastAPI:
     @app.on_event("startup")
     def on_startup():
         init_db()
-        ensure_admin_password()  # prints/admin password handling
+        ensure_admin_password()  # prints admin password on boot
 
     return app
 

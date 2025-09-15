@@ -1,4 +1,4 @@
-from typing import Tuple, Dict
+from typing import Dict
 from sqlmodel import select
 from ..storage import get_session
 from ..models import DrillTypeEnum, UserProgress
@@ -26,7 +26,6 @@ def level_info(uid: int, dt: DrillTypeEnum) -> tuple[int, str, dict]:
     return lvl, level_label(dt, lvl), get_preset(dt, lvl)
 
 def progress_payload(uid: int) -> Dict[str, dict]:
-    """Build the /progress JSON payload for all drill types."""
     ensure_progress_rows(uid)
     out: Dict[str, dict] = {}
     with get_session() as s:

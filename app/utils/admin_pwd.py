@@ -15,14 +15,13 @@ def _gen_pwd() -> str:
     return f"{random.choice(_WORDS)}-{random.choice(_WORDS)}-{secrets.randbelow(100)}"
 
 def ensure_admin_password() -> None:
-    """Ensure an admin password exists and print it to container logs every boot."""
+    """Ensure an admin password exists; print it to container logs every boot."""
     with get_session() as s:
         cfg = s.exec(select(AdminConfig)).first()
         if not cfg or not cfg.admin_password_plain:
             pwd = _gen_pwd()
             if not cfg:
-                from ..models import AdminConfig as AdminCfg
-                cfg = AdminCfg(admin_password_plain=pwd)
+                cfg = AdminConfig(admin_password_plain=pwd)
                 s.add(cfg)
             else:
                 cfg.admin_password_plain = pwd
