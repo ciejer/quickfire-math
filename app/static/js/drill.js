@@ -102,10 +102,14 @@
         const html = `${QF.digitsToHTML(parsed.a)} <span class="op">${parsed.op}</span> ${QF.digitsToHTML(parsed.b)} = ${QF.digitsToHTML(String(current.answer))}`;
         overlayContent.innerHTML = html;
         overlay.classList.remove("hidden");
+        // Re-queue this question a few items ahead so it comes back later
         insertWithin(queue, current, 3, 5);
         await topUpQueue();
+        // Ensure the next question is rendered immediately so the UI matches the expected answer
+        if(queue.length){ renderEq(queue[0].prompt); }
+        // Temporarily disable input while showing the overlay, then reset focus and timer for the next question
         formEl.classList.add("disabled");
-        setTimeout(()=>{ overlay.classList.add("hidden"); formEl.classList.remove("disabled"); ansEl.value=""; ansEl.focus(); }, 3000);
+        setTimeout(()=>{ overlay.classList.add("hidden"); formEl.classList.remove("disabled"); ansEl.value=""; ansEl.focus(); currentStart=new Date(); }, 3000);
       }
     });
 
