@@ -6,7 +6,7 @@
 
 .news-list{ display:grid; gap:10px; }
 .news-item{
-  background: linear-gradient(180deg, #202739, #1b2231);
+  background: var(--bg-elev);
   border:1px solid var(--border);
   border-radius: var(--radius-sm);
   padding: 10px 12px;
@@ -56,6 +56,13 @@
   box-shadow: 0 16px 32px rgba(118,179,255,.20);
 }
 
+/* Light theme: neutral, bright surfaces */
+html[data-theme="light"] .op-card{
+  background: var(--bg-elev);
+  border-color: var(--border);
+}
+html[data-theme="light"] .op-card:hover{ border-color: var(--accent); }
+
 /* Login users (2-column) */
 .user-grid{
   display:grid;
@@ -65,16 +72,14 @@
 @media (max-width: 640px){ .user-grid{ grid-template-columns: 1fr; } }
 .user-card{
   display:block; padding:24px 24px; min-height: 160px; width:100%;
-  background: radial-gradient(800px 400px at -10% -20%, rgba(118,179,255,.10), transparent 60%),
-              radial-gradient(600px 400px at 120% 0%, rgba(127,227,181,.08), transparent 60%),
-              linear-gradient(180deg, #26365a, #222f4d);
-  border:1px solid #4c6fb0;
+  background: var(--bg-elev);
+  border:1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: 0 14px 32px rgba(16,34,60,.38);
   text-align:left; display:flex; flex-direction:column; justify-content:center;
   cursor:pointer; color:var(--fg);
 }
-.user-card:hover{ border-color:#6a93df; }
+.user-card:hover{ border-color: var(--accent); }
 .user-name{ font-size:2.2rem; font-weight:900; letter-spacing:-0.01em; }
 .user-sub{ margin-top:8px; color:var(--fg-muted); font-weight:600; }
 .user-sub .user-star{ color:#ffd86b; }
