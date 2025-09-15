@@ -1,10 +1,9 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="layout">
+<div class="layout centered">
   <section class="main-col">
     <div class="row space-between">
       <h1 class="title">Who’s playing?</h1>
-      <a class="muted-link" href="/admin">Admin</a>
     </div>
 
     <div class="user-grid">
@@ -15,16 +14,10 @@
           <button class="user-card" type="submit">
             <div class="user-name">{{ u.display_name }}</div>
             {% if r %}
-            <div class="user-sub">
-              Last: {{ r.type|capitalize }}
-              {% if r.level %}
-                • Level <span class="lvl-num" data-level="{{ r.level }}">{{ r.level }}</span>
-              {% endif %}
-              {% if r.star %} • <span class="user-star" title="Star earned">★</span>{% endif %}
-              • {{ (r.elapsed_ms // 60000) }}:{{ "%02d"|format((r.elapsed_ms // 1000) % 60) }}
-            </div>
+              <div class="user-sub user-sub1">Last: {{ r.type|capitalize }}{% if r.level %} • Level <span class="lvl-num" data-level="{{ r.level }}">{{ r.level }}</span>{% endif %}</div>
+              <div class="user-sub user-sub2">{{ (r.elapsed_ms // 60000) }}:{{ "%02d"|format((r.elapsed_ms // 1000) % 60) }}{% if r.star %} • <span class="user-star" title="Star earned">★</span>{% endif %}</div>
             {% else %}
-            <div class="user-sub muted">No drills yet — be the first!</div>
+              <div class="user-sub muted">No drills yet — be the first!</div>
             {% endif %}
           </button>
         </form>
@@ -36,12 +29,10 @@
         <input type="text" name="display_name" placeholder="New player name">
         <button class="btn btn-primary">Add and start</button>
       </form>
+      <div style="margin-top:10px;"><a href="/admin" class="btn btn-secondary">Admin</a></div>
     </div>
   </section>
 
-  <aside class="news-col">
-    <div class="news-head">Tip</div>
-    <div class="news-item">Click a name to start. New players can add themselves below.</div>
-  </aside>
 </div>
 {% endblock %}
+

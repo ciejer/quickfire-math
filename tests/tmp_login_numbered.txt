@@ -1,0 +1,47 @@
+1:	{% extends "base.html" %}
+2:	{% block content %}
+3:	<div class="layout">
+4:	  <section class="main-col">
+5:	    <div class="row space-between">
+6:	      <h1 class="title">Who’s playing?</h1>
+7:	      <a class="muted-link" href="/admin">Admin</a>
+8:	    </div>
+9:	
+10:	    <div class="user-grid">
+11:	      {% for u in users %}
+12:	        {% set r = recent.get(u.id) if recent else None %}
+13:	        <form method="post" action="/login" class="user-tile-form">
+14:	          <input type="hidden" name="user_id" value="{{ u.id }}">
+15:	          <button class="user-card" type="submit">
+16:	            <div class="user-name">{{ u.display_name }}</div>
+17:	            {% if r %}
+18:	            <div class="user-sub">
+19:	              Last: {{ r.type|capitalize }}
+20:	              {% if r.level %}
+21:	                • Level <span class="lvl-num" data-level="{{ r.level }}">{{ r.level }}</span>
+22:	              {% endif %}
+23:	              {% if r.star %} • <span class="user-star" title="Star earned">★</span>{% endif %}
+24:	              • {{ (r.elapsed_ms // 60000) }}:{{ "%02d"|format((r.elapsed_ms // 1000) % 60) }}
+25:	            </div>
+26:	            {% else %}
+27:	            <div class="user-sub muted">No drills yet — be the first!</div>
+28:	            {% endif %}
+29:	          </button>
+30:	        </form>
+31:	      {% endfor %}
+32:	    </div>
+33:	
+34:	    <div class="card" style="margin-top:16px;">
+35:	      <form method="post" action="/user/add" class="row">
+36:	        <input type="text" name="display_name" placeholder="New player name">
+37:	        <button class="btn btn-primary">Add and start</button>
+38:	      </form>
+39:	    </div>
+40:	  </section>
+41:	
+42:	  <aside class="news-col">
+43:	    <div class="news-head">Tip</div>
+44:	    <div class="news-item">Click a name to start. New players can add themselves below.</div>
+45:	  </aside>
+46:	</div>
+47:	{% endblock %}

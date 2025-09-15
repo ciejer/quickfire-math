@@ -40,8 +40,13 @@ a:hover { text-decoration: underline; }
   grid-template-columns: 1fr 340px;
   gap: 20px;
 }
+.layout.centered{ grid-template-columns: 1fr; max-width: 900px; }
 .main-col { min-width: 0; }
 .news-col { min-width: 280px; }
+
+/* Sidebar slide-in (used on drill finish) */
+.sidebar-anim .news-col{ transform: translateX(32px); opacity: 0; }
+.sidebar-anim .news-col.reveal{ transform: none; opacity: 1; transition: transform .25s ease, opacity .25s ease; }
 
 .row{ display: flex; align-items: center; gap: 12px; }
 .space-between{ justify-content: space-between; }
@@ -71,7 +76,7 @@ a:hover { text-decoration: underline; }
 
 /* Fun CTA button for Start */
 .btn-cta{
-  font-size: 1.2rem; font-weight: 900; padding: 14px 22px; border-radius: 14px;
+  font-size: 1.5rem; font-weight: 900; padding: 16px 26px; border-radius: 16px;
   background: linear-gradient(180deg, #7FE3B5, #76B3FF);
   color:#0d1a33; border: none;
   box-shadow: 0 14px 28px rgba(118,179,255,.35);

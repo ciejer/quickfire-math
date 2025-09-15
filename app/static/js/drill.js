@@ -52,6 +52,10 @@
       if(document.getElementById("equation")) document.getElementById("equation").classList.add("hidden");
       formEl.classList.add("hidden");
       const cele = document.getElementById("celebrate"); if(cele) cele.classList.remove("hidden");
+      // Reveal sidebar and un-center layout with a slide-in
+      const wrap = document.getElementById('sidebar-wrap'); if(wrap) wrap.classList.remove('hidden');
+      const layout = document.getElementById('layout'); if(layout) layout.classList.remove('centered');
+      const aside = document.querySelector('.news-col'); if(aside) aside.classList.add('reveal');
 
       QF.apiStats().then(s=>QF.renderStats(document.getElementById("stats-list"),s));
       QF.apiFeed().then(f=>QF.renderFeed(document.getElementById("feed-list"), f.items));

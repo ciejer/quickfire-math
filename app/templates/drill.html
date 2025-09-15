@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="layout">
+<div id="layout" class="layout centered">
   <section class="main-col">
     <div class="row space-between">
       <a class="muted-link" href="/dashboard">← Dashboard</a>
@@ -73,7 +73,9 @@
     </script>
   </section>
 
-  {% include "components/_sidebar.html" %}
+  <div id="sidebar-wrap" class="sidebar-anim hidden">
+    {% include "components/_sidebar.html" %}
+  </div>
 </div>
 {% endblock %}
 

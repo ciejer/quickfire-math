@@ -1,16 +1,8 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <title>{{ app_name or "Quickfire Math" }}</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link href="/static/css/base.css" rel="stylesheet">
-  <link href="/static/css/components.css" rel="stylesheet">
-  {% block extra_css %}{% endblock %}
-</head>
-<body>
-  {% block content %}{% endblock %}
-  <script src="/static/js/core.js"></script>
-  {% block extra_js %}{% endblock %}
-</body>
-</html>
+<aside class="news-col">
+  <div class="card" style="position:sticky; top:16px;">
+    <div class="stats-head">Drills today</div>
+    <ul id="stats-list" class="stats-list"></ul>
+    <div class="news-head" style="margin-top:12px;">Recent drills</div>
+    <div id="feed-list" class="news-list"></div>
+  </div>
+</aside>
