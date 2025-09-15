@@ -65,4 +65,24 @@
   window.QF = { fmtTime, ding, winSound, starSound, levelUpSound, say, digitsToHTML, setDigits, starDots, unlockMediaOnce,
     apiNext, apiFeed, apiStats, apiProg, apiReportMul, apiReportAdd, apiReportSub,
     renderFeed, renderStats, renderProgressOnCards };
+
+  // -------- theme toggle --------
+  function applyTheme(theme){ try{ document.documentElement.setAttribute('data-theme', theme); localStorage.setItem('qf-theme', theme);}catch(e){} }
+  function initTheme(){
+    let t = 'dark';
+    try{
+      t = localStorage.getItem('qf-theme') || (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light':'dark');
+    }catch(e){}
+    applyTheme(t);
+    const btn = document.getElementById('theme-toggle');
+    if(btn){
+      btn.textContent = (t==='light') ? '🌙' : '☀️';
+      btn.addEventListener('click', ()=>{
+        const now = document.documentElement.getAttribute('data-theme')==='light' ? 'dark' : 'light';
+        applyTheme(now);
+        btn.textContent = (now==='light') ? '🌙' : '☀️';
+      });
+    }
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', initTheme); else initTheme();
 })();
