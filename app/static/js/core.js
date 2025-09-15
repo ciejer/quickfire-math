@@ -84,7 +84,7 @@ function renderProgressOnCards(p){
 }
 
 // Expose minimal API used by page scripts
-window.QF = { fmtTime, ding, winSound, starSound, levelUpSound, say, digitsToHTML, setDigits,
+window.QF = { fmtTime, ding, winSound, starSound, levelUpSound, say, digitsToHTML, setDigits, starDots,
   apiNext, apiFeed, apiStats, apiProg, apiReportMul, apiReportAdd, apiReportSub,
   renderFeed, renderStats, renderProgressOnCards
 };
