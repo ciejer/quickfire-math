@@ -4,37 +4,44 @@
   <section class="main-col">
     <div class="row space-between">
       <h1 class="title">Admin</h1>
-      <a class="muted-link" href="/">← Back</a>
+      <a class="muted-link" href="/">← Back to players</a>
     </div>
 
     {% if not authed %}
-      <form method="post" action="/admin/login" class="card">
-        <div class="row">
-          <input type="password" name="password" placeholder="Admin password">
-          <button class="btn btn-primary">Log in</button>
-        </div>
-        <div class="note">{{ hint }}</div>
+    <div class="card">
+      <form method="post" action="/admin/login" class="row">
+        <input type="password" name="password" placeholder="Admin password">
+        <button class="btn btn-primary">Sign in</button>
       </form>
+      <div class="note">{{ hint }}</div>
+    </div>
     {% else %}
-      <form method="post" action="/admin/logout" class="card" style="margin-bottom:12px;">
+    <div class="card">
+      <form method="post" action="/admin/logout">
         <button class="btn btn-secondary">Log out</button>
       </form>
+    </div>
 
-      <div class="card">
-        <h3>Players</h3>
-        <ul class="list">
-          {% for u in users %}
-            <li class="row space-between">
-              <span>{{ u.display_name }}</span>
-              <form method="post" action="/admin/delete_user" onsubmit="return confirm('Delete {{ u.display_name }}? This cannot be undone.');">
-                <input type="hidden" name="user_id" value="{{ u.id }}">
-                <button class="btn btn-danger">Delete</button>
-              </form>
-            </li>
-          {% endfor %}
-        </ul>
-      </div>
+    <div class="card" style="margin-top:12px;">
+      <h3>Players</h3>
+      <ul class="list">
+        {% for u in users %}
+        <li class="row space-between">
+          <div>{{ u.display_name }}</div>
+          <form method="post" action="/admin/delete_user" onsubmit="return confirm('Delete {{u.display_name}}?');">
+            <input type="hidden" name="user_id" value="{{ u.id }}">
+            <button class="btn btn-danger">Delete</button>
+          </form>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
     {% endif %}
   </section>
+
+  <aside class="news-col">
+    <div class="news-head">Tip</div>
+    <div class="news-item">Password prints to logs each boot. Change it from the console if needed.</div>
+  </aside>
 </div>
 {% endblock %}

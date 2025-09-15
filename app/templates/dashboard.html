@@ -67,18 +67,13 @@
     </details>
   </section>
 
-  <aside class="news-col">
-    <div class="stats-head">Drills finished today</div>
-    <ul id="stats-list" class="stats-list">
-      <li>Total: <strong>0</strong></li>
-      <li>Addition: <strong>0</strong></li>
-      <li>Subtraction: <strong>0</strong></li>
-      <li>Multiplication: <strong>0</strong></li>
-      <li>Division: <strong>0</strong></li>
-    </ul>
-
-    <div class="news-head">Your newsfeed</div>
-    <div id="feed-list" class="news-list"></div>
-  </aside>
+  {% include "components/_sidebar.html" %}
 </div>
+{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="/static/css/heatmap.css">
+{% endblock %}
+{% block extra_js %}
+<script src="/static/js/dashboard.js"></script>
 {% endblock %}
