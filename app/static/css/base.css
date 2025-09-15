@@ -21,6 +21,7 @@ body{
   background: radial-gradient(1200px 800px at 15% -10%, rgba(118,179,255,.08), transparent 60%),
               radial-gradient(900px 700px at 110% 10%, rgba(127,227,181,.08), transparent 60%),
               var(--bg);
+  background-attachment: fixed, fixed, fixed;
   color: var(--fg);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;

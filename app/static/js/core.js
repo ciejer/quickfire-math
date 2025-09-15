@@ -62,8 +62,7 @@
   function renderProgressOnCards(p){ if(!p) return; [["addition","card-addition","level-addition","stars-addition","badge-addition"], ["subtraction","card-subtraction","level-subtraction","stars-subtraction","badge-subtraction"], ["multiplication","card-multiplication","level-multiplication","stars-multiplication","badge-multiplication"], ["division","card-division","level-division","stars-division","badge-division"]].forEach(([k,cardId,levelId,starsId,badgeId])=>{ const card=document.getElementById(cardId), lvlEl=document.getElementById(levelId), stEl=document.getElementById(starsId), badge=document.getElementById(badgeId); const info=p[k]; if(!card||!lvlEl||!stEl||!info) return; const lvlHTML = `Level ${digitsToHTML(String(info.level))}: ${info.label}`; lvlEl.innerHTML = lvlHTML; stEl.textContent = starDots(info.last5); if(badge) badge.textContent = info.need_msg || "Get 3 of your last 5 stars to level up"; }); }
 
   // Expose minimal API used by page scripts
-  window.QF = { fmtTime, ding, winSound, starSound, levelUpSound, say, digitsToHTML, setDigits, starDots,
+  window.QF = { fmtTime, ding, winSound, starSound, levelUpSound, say, digitsToHTML, setDigits, starDots, unlockMediaOnce,
     apiNext, apiFeed, apiStats, apiProg, apiReportMul, apiReportAdd, apiReportSub,
     renderFeed, renderStats, renderProgressOnCards };
 })();
-

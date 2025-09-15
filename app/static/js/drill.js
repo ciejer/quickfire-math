@@ -125,7 +125,7 @@
     }
 
     formEl.addEventListener("submit", async (e)=>{
-      e.preventDefault(); unlockMediaOnce();
+      e.preventDefault(); if(window.QF && QF.unlockMediaOnce) QF.unlockMediaOnce();
       if(!queue.length) return;
       const current=queue.shift();
       const val=parseInt(ansEl.value,10); if(Number.isNaN(val)) return;
