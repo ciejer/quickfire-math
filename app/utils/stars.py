@@ -2,7 +2,7 @@ from typing import Optional, Tuple
 from itertools import product
 
 def _oldest_star_life_rounds(stars_recent: str) -> int:
-    s = (stars_recent or "")[-5:]
+    s = ("00000" + stars_recent or "00000")[-5:]
     if "1" not in s:
         return 0
     L = len(s)
