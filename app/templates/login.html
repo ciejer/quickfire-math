@@ -21,7 +21,7 @@
                 • Level <span class="lvl-num" data-level="{{ r.level }}">{{ r.level }}</span>
               {% endif %}
               {% if r.star %} • <span class="user-star" title="Star earned">★</span>{% endif %}
-              • {{ (r.elapsed_ms // 60000) }}:{{ ((r.elapsed_ms // 1000) % 60)|string|zfill(2) }}
+              • {{ (r.elapsed_ms // 60000) }}:{{ "%02d"|format((r.elapsed_ms // 1000) % 60) }}
             </div>
             {% else %}
             <div class="user-sub muted">No drills yet — be the first!</div>
