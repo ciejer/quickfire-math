@@ -1,8 +1,19 @@
 /* Heatmap grid */
-.hm{ display:block; border:1px solid var(--border); border-radius:10px; overflow:hidden; background:#0f1522; }
+/* Uses theme variables to adapt to dark/light */
+.hm{
+  display:block; border:1px solid var(--border); border-radius:10px; overflow:hidden;
+  background: var(--bg-elev);
+  /* theme-aware grid line + header backgrounds */
+  --hm-line: rgba(255,255,255,0.06);
+  --hm-head-bg: rgba(255,255,255,0.04);
+}
+html[data-theme="light"] .hm{
+  --hm-line: rgba(0,0,0,0.06);
+  --hm-head-bg: rgba(0,0,0,0.04);
+}
 .hm-row{ display:flex; gap:0; align-items:stretch; }
 .hm-row .hm-headcell{ display:inline-flex; align-items:center; justify-content:center; width:24px; height:20px; color:var(--fg-muted); font-size:.8rem; }
-.hm-row.hm-head{ display:flex; background:#121b2b; }
+.hm-row.hm-head{ display:flex; background: var(--hm-head-bg); }
 .hm-row.hm-head span{ display:inline-flex; align-items:center; justify-content:center; height:20px; width:20px; color:var(--fg-muted); font-size:.75rem; }
-.hm-cell{ display:inline-block; width:20px; height:20px; border-right:1px solid rgba(255,255,255,0.03); border-bottom:1px solid rgba(255,255,255,0.03); }
+.hm-cell{ display:inline-block; width:20px; height:20px; border-right:1px solid var(--hm-line); border-bottom:1px solid var(--hm-line); }
 .hm-row .hm-cell:last-child{ border-right:0; }

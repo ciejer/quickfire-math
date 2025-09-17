@@ -1,6 +1,30 @@
 (function(){
-  function commKey(prompt){ const m=prompt.match(/^\s*(\d+)\s*([+\u00D7])\s*(\d+)\s*$/); if(!m) return null; const a=+m[1], b=+m[3], op=m[2]; const lo=Math.min(a,b), hi=Math.max(a,b); return `${op}:${lo},${hi}`; }
-  function parsePrompt(prompt){ const m=prompt.match(/^\s*(\d+)\s*([+\u2212\u00D7\u00F7])\s*(\d+)\s*$/); return m?{a:m[1],op:m[2],b:m[3]}:null; }
+  function classifyOp(opStr){
+    if(!opStr) return null;
+    if(opStr.includes('+')) return '+';
+    if(/[×xX*]/.test(opStr)) return '\u00D7';
+    if(/[\u2212\-]/.test(opStr)) return '\u2212';
+    if(/[\u00F7\/]/.test(opStr)) return '\u00F7';
+    if(/A/.test(opStr)) return '\u00D7'; // tolerate corrupted mult symbol
+    return null;
+  }
+  function commKey(prompt){
+    // Broad parse: digits, operator-ish, digits
+    const m = prompt.match(/^\s*(\d+)\s*([^\d]+)\s*(\d+)\s*$/);
+    if(!m) return null;
+    const a=+m[1], b=+m[3], opRaw=m[2];
+    const op = classifyOp(opRaw);
+    if(op!=='+"' && op!=='\u00D7') return null;
+    const lo=Math.min(a,b), hi=Math.max(a,b); return `C:${lo},${hi}`;
+  }
+  function parsePrompt(prompt){
+    let m = prompt.match(/^\s*(\d+)\s*([+\u2212\u00D7\u00F7])\s*(\d+)\s*$/);
+    if(m) return {a:m[1], op:m[2], b:m[3]};
+    const g = prompt.match(/^\s*(\d+)\s*([^\d]+)\s*(\d+)\s*$/);
+    if(!g) return null;
+    const op = classifyOp(g[2]) || '?';
+    return {a:g[1], op:op, b:g[3]};
+  }
   function renderEq(prompt){ const p=parsePrompt(prompt); if(!p) return; QF.setDigits(document.getElementById("num-a"), p.a); QF.setDigits(document.getElementById("num-b"), p.b); const op=document.getElementById("op"); if(op) op.textContent=p.op; }
   function insertWithin(arr,item,minAhead=3,maxAhead=5){ const pos=Math.min(arr.length, Math.floor(Math.random()*(maxAhead-minAhead+1))+minAhead); arr.splice(pos,0,item); }
 

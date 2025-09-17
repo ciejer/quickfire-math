@@ -15,7 +15,20 @@
   function winSound(){ [523.25,659.25,783.99].forEach((f,i)=>tone(f,0.15,0.05,i*0.1)); }
   function starSound(){ const seq=[659.25,783.99,987.77,1174.66,1318.51,1567.98]; seq.forEach((f,i)=>{ tone(f,0.12,0.07,i*0.07); tone(f*1.5,0.1,0.045,i*0.07+0.03); }); tone(1975.53,0.18,0.06,seq.length*0.07); }
   function levelUpSound(){ [392,523.25,659.25,783.99,1046.5].forEach((f,i)=>tone(f,0.18,0.06,i*0.12)); }
-  function say(text){ if(!window.speechSynthesis) return; try{ const u=new SpeechSynthesisUtterance(text); u.rate=1.05; const enNZ=speechSynthesis.getVoices().find(v=>/en[-_]NZ/i.test(v.lang)); if(enNZ) u.voice=enNZ; speechSynthesis.cancel(); speechSynthesis.speak(u);}catch{} }
+  // Speech robustness: wait for voices, prefer en-NZ then en-*, retry if empty
+  let voicesReady=false; let voiceList=[]; let waitingSay=[];
+  function loadVoices(){ try{ voiceList = speechSynthesis.getVoices(); if(voiceList && voiceList.length){ voicesReady=true; return; } }catch{}
+    try{ speechSynthesis.onvoiceschanged = ()=>{ try{ voiceList = speechSynthesis.getVoices(); if(voiceList && voiceList.length){ voicesReady=true; speechSynthesis.onvoiceschanged=null; const q=[...waitingSay]; waitingSay.length=0; q.forEach(t=>say(t)); } }catch{} } }catch{}
+  }
+  function pickVoice(){ if(!voiceList||!voiceList.length) return null; let v=voiceList.find(v=>/en[-_]NZ/i.test(v.lang)); if(v) return v; v=voiceList.find(v=>/^en[-_]/i.test(v.lang)); return v||null; }
+  function say(text){ if(!window.speechSynthesis||!text) return; try{
+      loadVoices();
+      if(!voicesReady){ waitingSay.push(text); return; }
+      const u=new SpeechSynthesisUtterance(text); u.rate=1.05; const v=pickVoice(); if(v) u.voice=v; u.lang = (v && v.lang) || 'en-US';
+      try{ speechSynthesis.cancel(); }catch{}
+      speechSynthesis.speak(u);
+    }catch{}
+  }
 
   // -------- digit colouring (only where we call setDigits) --------
   function digitsToHTML(str){ return String(str).replace(/\d/g,d=>`<span class="digit d${d}">${d}</span>`); }

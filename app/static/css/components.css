@@ -61,6 +61,10 @@ html[data-theme="light"] .op-card{
   background: var(--bg-elev);
   border-color: var(--border);
 }
+html[data-theme="light"] .op-badge{
+  background: var(--accent);
+  border-color: var(--border);
+}
 html[data-theme="light"] .op-card:hover{ border-color: var(--accent); }
 
 /* Login users (2-column) */
